@@ -2,7 +2,7 @@
 
 """Given a complete set of IDs, reduces each one to the minimal initial string needed to distinguish it from the others"""
 
-# TODO: think through API, write unit tests
+# TODO: think through API
 
 class prefix_dict(dict):
    """A set that enables lookup based on the shortest unique prefix, for a relatively small number of string keys"""
