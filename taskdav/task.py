@@ -7,6 +7,7 @@ from datetime import datetime
 import caldav
 import urllib2
 import short_id
+import aaargh
 
 def get_object_urlname(davobject):
     """Returns the last component of the url path as the object's name"""
@@ -48,11 +49,20 @@ class TaskDAVClient(caldav.DAVClient):
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
 client = TaskDAVClient(url)
 
-task_lookup = client.get_tasks("Tasks")
-for task_id in sorted(task_lookup):
-    task = task_lookup[task_id]
-    task.load()
-    # task.instance.prettyPrint()
-    vtodo = task.instance.vtodo
-    print task_lookup.shortest(task_id), task_id, vtodo.status.value, vtodo.summary.value, vtodo.priority.value
+app = aaargh.App(description="A simple command-line tool for interacting with Tasks over CalDAV")
+
+app.arg('-n', '--calendar-name', help="Name of the calendar to use", default="Tasks")
+
+@app.cmd
+def list(calendar_name):
+    task_lookup = client.get_tasks(calendar_name)
+    for task_id in sorted(task_lookup):
+        task = task_lookup[task_id]
+        task.load()
+        # task.instance.prettyPrint()
+        vtodo = task.instance.vtodo
+        print task_lookup.shortest(task_id), task_id, vtodo.status.value, vtodo.summary.value, vtodo.priority.value
+
+if __name__ == "__main__":
+    app.run()
 
