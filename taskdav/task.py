@@ -20,6 +20,8 @@ class TaskDAVClient(caldav.DAVClient):
         caldav.DAVClient.__init__(self, url)
         # cache a principal we can use
         self.principal = caldav.Principal(self, url)
+        self.calendar_lookup = {}
+        self.calendar_tasks = {}
         self.cache_calendars()
 
     def cache_calendars(self):
@@ -30,19 +32,23 @@ class TaskDAVClient(caldav.DAVClient):
             # print (calendar.url.geturl(), name, calendar.id)
             self.calendar_lookup[name] = calendar
 
+    def get_calendar(self, calendar_name):
+        return self.calendar_lookup[calendar_name]
+
+    def cache_tasks(self, calendar_name):
+        self.calendar_tasks[calendar_name] = tasks = short_id.prefix_dict()
+        for task in self.get_calendar(calendar_name).events():
+            task_id = task.id or (get_object_urlname(task).replace(".ics", ""))
+            tasks[task_id] = task
+
+    def get_tasks(self, calendar_name):
+        self.cache_tasks(calendar_name)
+        return self.calendar_tasks[calendar_name]
+
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
 client = TaskDAVClient(url)
-client.cache_calendars()
 
-tasks_calendar = client.calendar_lookup["Tasks"]
-
-tasks = tasks_calendar.events()
-task_lookup = short_id.prefix_dict()
-
-for task in tasks:
-    task_id = task.id or (get_object_urlname(task).replace(".ics", ""))
-    task_lookup[task_id] = task
-
+task_lookup = client.get_tasks("Tasks")
 for task_id in sorted(task_lookup):
     task = task_lookup[task_id]
     task.load()
