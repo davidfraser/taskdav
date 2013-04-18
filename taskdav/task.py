@@ -100,7 +100,6 @@ def add(calendar_name, task):
     # todo.add('sequence').value = "0"
     todo.add('status').value = 'NEEDS-ACTION'
     todo.add('uid').value = uid = str(uuid.uuid1())
-
     try:
         event = caldav.Event(client, data=cal.serialize(), parent=client.get_calendar(calendar_name), id=uid)
         event.save()
@@ -108,6 +107,13 @@ def add(calendar_name, task):
         print "Error saving event: %r" % e
 
 alias("add", "a")
+
+@app.cmd
+@app.cmd_arg('tasks', type=str, nargs='+', help="The description of the tasks (one per line)")
+def addm(calendar_name, tasks):
+    tasks = [task.strip() for task in " ".join(tasks).split("\n") if task.strip()]
+    for task in tasks:
+        add(calendar_name, [task])
 
 if __name__ == "__main__":
     app.run()
