@@ -154,6 +154,21 @@ def rm(calendar_name, task_id):
 
 alias("rm", "del")
 
+@app.cmd
+@app.cmd_arg('task_ids', type=str, nargs='+', help="ID of the task(s) to deprioritize")
+def depri(calendar_name, task_ids):
+    for task_id in task_ids:
+        task = client.get_task(calendar_name, task_id)
+        vtodo = task.instance.vtodo
+        if not hasattr(vtodo, "priority"):
+            vtodo.add("priority").value = "5"
+        else:
+            vtodo.priority.value = "5"
+        task.save()
+        print task_id, task.id, format_task(task)
+
+alias("depri", "dp")
+
 if __name__ == "__main__":
     app.run()
 
