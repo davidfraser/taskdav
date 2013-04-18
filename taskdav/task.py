@@ -52,6 +52,15 @@ class TaskDAVClient(caldav.DAVClient):
             self.cache_tasks(calendar_name)
         return self.calendar_tasks[calendar_name]
 
+    def get_task(self, calendar_name, task_id):
+        tasks = self.get_tasks(calendar_name)
+        task = tasks.unique(task_id)
+        if not task.instance:
+            task.load()
+        if not task.id:
+            task.id = task.instance.vtodo.uid.value
+        return task
+
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
 client = TaskDAVClient(url)
 
@@ -68,19 +77,19 @@ def alias(name, alias_name):
 def get_todo_attr_value(vtodo, attrname):
     return getattr(getattr(vtodo, attrname, None), "value", None)
 
-def format_task(task_lookup, task_id):
-    task = task_lookup[task_id]
+def format_task(task):
     if not task.instance:
         task.load()
     vtodo = task.instance.vtodo
     gtav = lambda attrname: get_todo_attr_value(vtodo, attrname)
-    return "%s %s %s %s %s" % (task_lookup.shortest(task_id), task_id, gtav("status"), gtav("summary"), gtav("priority"))
+    return "%s %s %s" % ( gtav("status"), gtav("summary"), gtav("priority"))
 
 @app.cmd(name="list", help="List tasks")
 def list_(calendar_name):
     task_lookup = client.get_tasks(calendar_name)
     for task_id in sorted(task_lookup):
-        print format_task(task_lookup, task_id)
+        task = task_lookup[task_id]
+        print task_lookup.shortest(task_id), task_id, format_task(task)
 
 @app.cmd
 @app.cmd_arg('task', type=str, nargs='+', help="The description of the task")
@@ -116,6 +125,19 @@ def addm(calendar_name, tasks):
     tasks = [task.strip() for task in " ".join(tasks).split("\n") if task.strip()]
     for task in tasks:
         add(calendar_name, [task])
+
+@app.cmd
+@app.cmd_arg('task_id', type=str, help="ID of the task to add to")
+@app.cmd_arg('text', type=str, nargs='+', help="Extra text to add to the task")
+def append(calendar_name, task_id, text):
+    text = " ".join(text)
+    task = client.get_task(calendar_name, task_id)
+    vtodo = task.instance.vtodo
+    vtodo.summary.value = vtodo.summary.value.rstrip(" ") + " " + text
+    task.save()
+    print task_id, task.id, format_task(task)
+
+alias("append", "app")
 
 if __name__ == "__main__":
     app.run()
