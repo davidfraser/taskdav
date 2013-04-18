@@ -27,7 +27,6 @@ class TaskDAVClient(caldav.DAVClient):
         self.principal = caldav.Principal(self, url)
         self.calendar_lookup = {}
         self.calendar_tasks = {}
-        self.cache_calendars()
 
     def cache_calendars(self):
         self.calendar_lookup = {}
@@ -38,6 +37,8 @@ class TaskDAVClient(caldav.DAVClient):
             self.calendar_lookup[name] = calendar
 
     def get_calendar(self, calendar_name):
+        if not calendar_name in self.calendar_lookup:
+            self.cache_calendars()
         return self.calendar_lookup[calendar_name]
 
     def cache_tasks(self, calendar_name):
@@ -47,7 +48,8 @@ class TaskDAVClient(caldav.DAVClient):
             tasks[task_id] = task
 
     def get_tasks(self, calendar_name):
-        self.cache_tasks(calendar_name)
+        if not calendar_name in self.calendar_tasks:
+            self.cache_tasks(calendar_name)
         return self.calendar_tasks[calendar_name]
 
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
