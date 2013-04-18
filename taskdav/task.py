@@ -91,6 +91,8 @@ def list_(calendar_name):
         task = task_lookup[task_id]
         print task_lookup.shortest(task_id), task_id, format_task(task)
 
+alias("list", "ls")
+
 @app.cmd
 @app.cmd_arg('task', type=str, nargs='+', help="The description of the task")
 def add(calendar_name, task):
@@ -138,6 +140,19 @@ def append(calendar_name, task_id, text):
     print task_id, task.id, format_task(task)
 
 alias("append", "app")
+
+@app.cmd
+@app.cmd_arg('task_id', type=str, help="ID of the task to delete")
+def rm(calendar_name, task_id):
+    task = client.get_task(calendar_name, task_id)
+    print task_id, task.id, format_task(task)
+    answer = ""
+    while answer not in {"y", "n"}:
+        answer = raw_input("delete (y/n)").lower()
+    if answer == "y":
+        task.delete()
+
+alias("rm", "del")
 
 if __name__ == "__main__":
     app.run()
