@@ -57,6 +57,12 @@ app = aaargh.App(description="A simple command-line tool for interacting with Ta
 
 app.arg('-n', '--calendar-name', help="Name of the calendar to use", default="Tasks")
 
+def alias(name, alias_name):
+    """Adds an alias to the given command name"""
+    # TODO: extend aaargh to handle this properly, so that it displays the aliases etc
+    parser_map = app._parser._subparsers._group_actions[0]._name_parser_map
+    parser_map[alias_name] = parser_map[name]
+
 def get_todo_attr_value(vtodo, attrname):
     return getattr(getattr(vtodo, attrname, None), "value", None)
 
@@ -100,6 +106,8 @@ def add(calendar_name, task):
         event.save()
     except Exception, e:
         print "Error saving event: %r" % e
+
+alias("add", "a")
 
 if __name__ == "__main__":
     app.run()
