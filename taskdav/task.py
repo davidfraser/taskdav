@@ -57,15 +57,22 @@ app = aaargh.App(description="A simple command-line tool for interacting with Ta
 
 app.arg('-n', '--calendar-name', help="Name of the calendar to use", default="Tasks")
 
+def get_todo_attr_value(vtodo, attrname):
+    return getattr(getattr(vtodo, attrname, None), "value", None)
+
+def format_task(task_lookup, task_id):
+    task = task_lookup[task_id]
+    if not task.instance:
+        task.load()
+    vtodo = task.instance.vtodo
+    gtav = lambda attrname: get_todo_attr_value(vtodo, attrname)
+    return "%s %s %s %s %s" % (task_lookup.shortest(task_id), task_id, gtav("status"), gtav("summary"), gtav("priority"))
+
 @app.cmd(name="list", help="List tasks")
 def list_(calendar_name):
     task_lookup = client.get_tasks(calendar_name)
     for task_id in sorted(task_lookup):
-        task = task_lookup[task_id]
-        task.load()
-        # task.instance.prettyPrint()
-        vtodo = task.instance.vtodo
-        print task_lookup.shortest(task_id), task_id, vtodo.status.value, vtodo.summary.value, vtodo.priority.value
+        print format_task(task_lookup, task_id)
 
 @app.cmd
 @app.cmd_arg('task', type=str, nargs='+', help="The description of the task")
@@ -79,6 +86,12 @@ def add(calendar_name, task):
     todo.add('created').value = date
     todo.add('dtstamp').value = date
     todo.add('last-modified').value = date
+    # organizer = todo.add('organizer')
+    # organizer.value = "mailto:%s" % ACCOUNT_EMAIL_ADDRESS
+    # organizer.params["CN"] = [ACCOUNT_FULL_NAME]
+    # todo.add('percent-complete').value = "0"
+    # todo.add('priority').value = "5"
+    # todo.add('sequence').value = "0"
     todo.add('status').value = 'NEEDS-ACTION'
     todo.add('uid').value = uid = str(uuid.uuid1())
 
