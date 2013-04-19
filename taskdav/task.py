@@ -128,7 +128,7 @@ def listall(calendar_name, term):
 
 alias("listall", "lsa")
 
-TASK_RE = re.compile(r'(?:^|\s)(@\w*\b)')
+CONTEXT_RE = re.compile(r'(?:^|\s)(@\w*\b)')
 
 @app.cmd(help="Lists all the task contexts that start with the @ sign in task summaries")
 def listcon(calendar_name):
@@ -138,11 +138,27 @@ def listcon(calendar_name):
         task = client.get_task(calendar_name, task_id)
         if task_attr(task, "status") != "COMPLETED":
             summary = task_attr(task, "summary")
-            contexts.update(TASK_RE.findall(summary))
+            contexts.update(CONTEXT_RE.findall(summary))
     for context in sorted(contexts):
         print context
 
 alias("listcon", "lsc")
+
+PROJ_RE = re.compile(r'(?:^|\s)(\+\w*\b)')
+
+@app.cmd(help="Lists all the task projects that start with the + sign in task summaries")
+def listproj(calendar_name):
+    task_lookup = client.get_tasks(calendar_name)
+    projects = set()
+    for task_id in task_lookup:
+        task = client.get_task(calendar_name, task_id)
+        if task_attr(task, "status") != "COMPLETED":
+            summary = task_attr(task, "summary")
+            projects.update(PROJ_RE.findall(summary))
+    for project in sorted(projects):
+        print project
+
+alias("listproj", "lsprj")
 
 @app.cmd
 @app.cmd_arg('task', type=str, nargs='+', help="The description of the task")
@@ -169,6 +185,7 @@ def add(calendar_name, task):
         event.save()
     except Exception, e:
         print "Error saving event: %r" % e
+    print uid, format_task(event)
 
 alias("add", "a")
 
