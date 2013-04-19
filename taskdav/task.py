@@ -135,6 +135,19 @@ def listall(calendar_name, term):
 
 alias("listall", "lsa")
 
+@app.cmd(help="Reports on the number of open and done tasks")
+def report(calendar_name):
+    date = datetime.utcnow().replace(tzinfo=utc)
+    task_lookup = client.get_tasks(calendar_name)
+    task_status_count = {}
+    for task_id in sorted(task_lookup):
+        task = client.get_task(calendar_name, task_id)
+        status = task_attr(task, "status")
+        task_status_count[status] = task_status_count.get(status, 0) + 1
+    print date
+    for status in sorted(task_status_count):
+        print status, task_status_count[status]
+
 @app.cmd(help="Displays all incomplete tasks of the given (or any) priority containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('priority', type=str, nargs='?', help="Priority")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
