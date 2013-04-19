@@ -176,7 +176,7 @@ def add(calendar_name, text):
     todo.add('priority').value = "0"
     # todo.add('sequence').value = "0"
     todo.add('status').value = 'NEEDS-ACTION'
-    todo.add('uid').value = uid = str(uuid.uuid1())
+    todo.add('uid').value = uid = str(uuid.uuid4())
     try:
         task = caldav.Event(client, data=cal.serialize(), parent=client.get_calendar(calendar_name), id=uid)
         task.save()
