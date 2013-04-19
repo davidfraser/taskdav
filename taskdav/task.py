@@ -271,6 +271,22 @@ def rm(calendar_name, task_id):
 alias("rm", "del")
 
 @app.cmd
+@app.cmd_arg('priority', type=str, help="Priority")
+@app.cmd_arg('task_id', type=str, help="ID of the task to prioritize")
+def pri(calendar_name, priority, task_id):
+    task = client.get_task(calendar_name, task_id)
+    vtodo = task.instance.vtodo
+    priority = str(PRIORITY_C2I[priority])
+    if not hasattr(vtodo, "priority"):
+        vtodo.add("priority").value = priority
+    else:
+        vtodo.priority.value = priority
+    task.save()
+    print task_id, task.id, format_task(task)
+
+alias("pri", "p")
+
+@app.cmd
 @app.cmd_arg('task_ids', type=str, nargs='+', help="ID of the task(s) to deprioritize")
 def depri(calendar_name, task_ids):
     for task_id in task_ids:
@@ -278,9 +294,9 @@ def depri(calendar_name, task_ids):
         vtodo = task.instance.vtodo
         # TODO: this doesn't seem to correspond to priority on Thunderbird??
         if not hasattr(vtodo, "priority"):
-            vtodo.add("priority").value = "5"
+            vtodo.add("priority").value = "0"
         else:
-            vtodo.priority.value = "5"
+            vtodo.priority.value = "0"
         task.save()
         print task_id, task.id, format_task(task)
 
