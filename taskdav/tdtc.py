@@ -30,17 +30,6 @@ PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
 PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
 PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
 
-def get_todo_attr_value(vtodo, attrname):
-    return getattr(getattr(vtodo, attrname, None), "value", None)
-
-def format_task(task):
-    if not task.instance:
-        task.load()
-    vtodo = task.instance.vtodo
-    gtav = lambda attrname: get_todo_attr_value(vtodo, attrname)
-    priority = PRIORITY_I2C[int(gtav("priority") or "0")]
-    return "%s%s %s" % (priority + " " if priority else "", gtav("summary"), gtav("status"))
-
 __NOT_FOUND = object()
 
 def attrs(obj, default, *attrs):
@@ -54,6 +43,15 @@ def attrs(obj, default, *attrs):
 def task_attr(task, attrname, default=""):
     """returns the given task's attribute by looking up task.instance.vtodo.[attrname].value"""
     return attrs(task.instance, default, "vtodo", attrname, "value")
+
+def format_task(task):
+    """Formats a task for output"""
+    if not task.instance:
+        task.load()
+    priority = PRIORITY_I2C[int(task_attr(task, "priority") or "0")]
+    status = task_attr(task, "status")
+    status_str = ("x " if status == "COMPLETED" else "") + (priority + " " if priority else "")
+    return "%s%s %s" % (status_str, task_attr(task, "summary"), task_attr(task, "status"))
 
 @app.cmd(name="list", help="Displays all incomplete tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
