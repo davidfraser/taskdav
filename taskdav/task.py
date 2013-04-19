@@ -103,10 +103,11 @@ def task_attr(task, attrname, default=""):
 def list_(calendar_name, term):
     task_lookup = client.get_tasks(calendar_name)
     # TODO: make lookup by known ID not have to load all tasks
+    term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
         if task_attr(task, "status") != "COMPLETED":
-            search_text = task_attr(task, "summary")
+            search_text = task_attr(task, "summary").lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
                 print task_lookup.shortest(task_id), task_id, format_task(task)
 
@@ -117,9 +118,10 @@ alias("list", "ls")
 def listall(calendar_name, term):
     task_lookup = client.get_tasks(calendar_name)
     # TODO: make lookup by known ID not have to load all tasks
+    term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        search_text = task_attr(task, "summary")
+        search_text = task_attr(task, "summary").lower()
         if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
             print task_lookup.shortest(task_id), task_id, format_task(task)
 
