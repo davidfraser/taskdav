@@ -4,8 +4,6 @@ import caldav
 import urllib2
 import short_id
 
-utc = caldav.vobject.icalendar.utc
-
 def get_object_urlname(davobject):
     """Returns the last component of the url path as the object's name"""
     name = davobject.url.path.rstrip("/")

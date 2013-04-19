@@ -14,6 +14,8 @@ cfg = config.get_config()
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
 client = task.TaskDAVClient(url)
 
+utc = caldav.vobject.icalendar.utc
+
 app = aaargh.App(description="A simple command-line tool for interacting with Tasks over CalDAV")
 
 app.arg('-n', '--calendar-name', help="Name of the calendar to use", default="Tasks")
@@ -64,7 +66,7 @@ def list_(calendar_name, term):
         if task_attr(task, "status") != "COMPLETED":
             search_text = task_attr(task, "summary").lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
-                print task_lookup.shortest(task_id), task_id, format_task(task)
+                print task_lookup.shortest(task_id), format_task(task)
 
 alias("list", "ls")
 
@@ -78,7 +80,7 @@ def listall(calendar_name, term):
         task = client.get_task(calendar_name, task_id)
         search_text = task_attr(task, "summary").lower()
         if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
-            print task_lookup.shortest(task_id), task_id, format_task(task)
+            print task_lookup.shortest(task_id), format_task(task)
 
 alias("listall", "lsa")
 
@@ -118,7 +120,7 @@ def listpri(calendar_name, priority, term):
         if task_attr(task, "status") != "COMPLETED" and int(task_attr(task, "priority", "") or "0") in priorities:
             search_text = task_attr(task, "summary").lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
-                print task_lookup.shortest(task_id), task_id, format_task(task)
+                print task_lookup.shortest(task_id), format_task(task)
 
 alias("listpri", "lsp")
 
@@ -155,14 +157,14 @@ def listproj(calendar_name):
 alias("listproj", "lsprj")
 
 @app.cmd
-@app.cmd_arg('task', type=str, nargs='+', help="The description of the task")
-def add(calendar_name, task):
-    task = " ".join(task)
+@app.cmd_arg('text', type=str, nargs='+', help="The description of the task")
+def add(calendar_name, text):
+    text = " ".join(text)
     cal = caldav.vobject.iCalendar()
     todo = cal.add('vtodo')
     date = datetime.utcnow().replace(tzinfo=utc)
     todo.add('class').value = 'PUBLIC'
-    todo.add('summary').value = task
+    todo.add('summary').value = text
     todo.add('created').value = date
     todo.add('dtstamp').value = date
     todo.add('last-modified').value = date
@@ -176,11 +178,13 @@ def add(calendar_name, task):
     todo.add('status').value = 'NEEDS-ACTION'
     todo.add('uid').value = uid = str(uuid.uuid1())
     try:
-        event = caldav.Event(client, data=cal.serialize(), parent=client.get_calendar(calendar_name), id=uid)
-        event.save()
+        task = caldav.Event(client, data=cal.serialize(), parent=client.get_calendar(calendar_name), id=uid)
+        task.save()
     except Exception, e:
         print "Error saving event: %r" % e
-    print uid, format_task(event)
+    task_lookup = client.get_tasks(calendar_name)
+    task_lookup[uid] = task
+    print task_lookup.shortest(uid), format_task(task)
 
 alias("add", "a")
 
@@ -200,7 +204,8 @@ def replace(calendar_name, task_id, text):
     vtodo = task.instance.vtodo
     vtodo.summary.value = text
     task.save()
-    print task_id, task.id, format_task(task)
+    task_lookup = client.get_tasks(calendar_name)
+    print task_lookup.shortest(task_id), format_task(task)
 
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
@@ -211,7 +216,8 @@ def append(calendar_name, task_id, text):
     vtodo = task.instance.vtodo
     vtodo.summary.value = vtodo.summary.value.rstrip(" ") + " " + text
     task.save()
-    print task_id, task.id, format_task(task)
+    task_lookup = client.get_tasks(calendar_name)
+    print task_lookup.shortest(task_id), format_task(task)
 
 alias("append", "app")
 
@@ -224,7 +230,8 @@ def prepend(calendar_name, task_id, text):
     vtodo = task.instance.vtodo
     vtodo.summary.value = text + " " + vtodo.summary.value.lstrip(" ")
     task.save()
-    print task_id, task.id, format_task(task)
+    task_lookup = client.get_tasks(calendar_name)
+    print task_lookup.shortest(task_id), format_task(task)
 
 alias("prepend", "prep")
 
@@ -232,7 +239,8 @@ alias("prepend", "prep")
 @app.cmd_arg('task_id', type=str, help="ID of the task to delete")
 def rm(calendar_name, task_id):
     task = client.get_task(calendar_name, task_id)
-    print task_id, task.id, format_task(task)
+    task_lookup = client.get_tasks(calendar_name)
+    print task_lookup.shortest(task_id), format_task(task)
     answer = ""
     while answer not in {"y", "n"}:
         answer = raw_input("delete (y/n)").lower()
@@ -253,13 +261,15 @@ def pri(calendar_name, priority, task_id):
     else:
         vtodo.priority.value = priority
     task.save()
-    print task_id, task.id, format_task(task)
+    task_lookup = client.get_tasks(calendar_name)
+    print task_lookup.shortest(task_id), format_task(task)
 
 alias("pri", "p")
 
 @app.cmd
 @app.cmd_arg('task_ids', type=str, nargs='+', help="ID of the task(s) to deprioritize")
 def depri(calendar_name, task_ids):
+    task_lookup = client.get_tasks(calendar_name)
     for task_id in task_ids:
         task = client.get_task(calendar_name, task_id)
         vtodo = task.instance.vtodo
@@ -269,13 +279,14 @@ def depri(calendar_name, task_ids):
         else:
             vtodo.priority.value = "0"
         task.save()
-        print task_id, task.id, format_task(task)
+        print task_lookup.shortest(task_id), format_task(task)
 
 alias("depri", "dp")
 
 @app.cmd
 @app.cmd_arg('task_ids', type=str, nargs='+', help="ID of the task(s) to mark as done")
 def do(calendar_name, task_ids):
+    task_lookup = client.get_tasks(calendar_name)
     for task_id in task_ids:
         task = client.get_task(calendar_name, task_id)
         vtodo = task.instance.vtodo
@@ -286,7 +297,7 @@ def do(calendar_name, task_ids):
         if hasattr(vtodo, "percent_complete"):
             vtodo.percent_complete.value = "100"
         task.save()
-        print task_id, task.id, format_task(task)
+        print task_lookup.shortest(task_id), format_task(task)
 
 if __name__ == "__main__":
     app.run()
