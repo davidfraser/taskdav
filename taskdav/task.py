@@ -169,6 +169,21 @@ def depri(calendar_name, task_ids):
 
 alias("depri", "dp")
 
+@app.cmd
+@app.cmd_arg('task_ids', type=str, nargs='+', help="ID of the task(s) to mark as done")
+def do(calendar_name, task_ids):
+    for task_id in task_ids:
+        task = client.get_task(calendar_name, task_id)
+        vtodo = task.instance.vtodo
+        if not hasattr(vtodo, "status"):
+            vtodo.add("status").value = "COMPLETED"
+        else:
+            vtodo.status.value = "COMPLETED"
+        if hasattr(vtodo, "percent_complete"):
+            vtodo.percent_complete.value = "100"
+        task.save()
+        print task_id, task.id, format_task(task)
+
 if __name__ == "__main__":
     app.run()
 
