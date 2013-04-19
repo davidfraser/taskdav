@@ -98,7 +98,7 @@ def task_attr(task, attrname, default=""):
     """returns the given task's attribute by looking up task.instance.vtodo.[attrname].value"""
     return attrs(task.instance, default, "vtodo", attrname, "value")
 
-@app.cmd(name="list", help="Displays all incomplete tasks containing the given search terms (if any) either as ID prefix or summary text")
+@app.cmd(name="list", help="Displays all incomplete tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
 def list_(calendar_name, term):
     task_lookup = client.get_tasks(calendar_name)
@@ -107,12 +107,12 @@ def list_(calendar_name, term):
         task = client.get_task(calendar_name, task_id)
         if task_attr(task, "status") != "COMPLETED":
             search_text = task_attr(task, "summary")
-            if all(task.id.startswith(t) or (t[1:] not in search_text if t.startswith('-') else t in search_text) for t in term):
+            if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
                 print task_lookup.shortest(task_id), task_id, format_task(task)
 
 alias("list", "ls")
 
-@app.cmd(help="Displays all tasks containing the given search terms (if any) either as ID prefix or summary text")
+@app.cmd(help="Displays all tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
 def listall(calendar_name, term):
     task_lookup = client.get_tasks(calendar_name)
@@ -120,7 +120,7 @@ def listall(calendar_name, term):
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
         search_text = task_attr(task, "summary")
-        if all(task.id.startswith(t) or (t[1:] not in search_text if t.startswith('-') else t in search_text) for t in term):
+        if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
             print task_lookup.shortest(task_id), task_id, format_task(task)
 
 alias("listall", "lsa")
