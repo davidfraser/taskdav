@@ -128,6 +128,38 @@ def listall(calendar_name, term):
 
 alias("listall", "lsa")
 
+# priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low)
+PRIORITIES = [("A", 1), ("B", 2), ("C", 3), ("D", 4), ("", 5), ("", 0), ("E", 6), ("F", 7), ("G", 8), ("H", 9)]
+PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
+PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
+
+@app.cmd(help="Displays all incomplete tasks of the given (or any) priority containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
+@app.cmd_arg('priority', type=str, nargs='?', help="Priority")
+@app.cmd_arg('term', type=str, nargs='*', help="Search terms")
+def listpri(calendar_name, priority, term):
+    if priority and not PRIORITY_RE.match(priority):
+        term.insert(0, priority)
+        priority = None
+    if priority:
+        priority = priority.upper()
+        if "-" in priority:
+            start_i, stop = PRIORITY_C2I[priority[0]], PRIORITY_C2I[priority[2]]
+            priorities = {pi for pc, pi in PRIORITIES if start_i <= pi <= stop_i and pc}
+        else:
+            priorities = {PRIORITY_C2I[priority]}
+    else:
+        priorities = {pi for pc, pi in PRIORITIES if pc}
+    task_lookup = client.get_tasks(calendar_name)
+    term = [t.lower() for t in term]
+    for task_id in sorted(task_lookup):
+        task = client.get_task(calendar_name, task_id)
+        if task_attr(task, "status") != "COMPLETED" and int(task_attr(task, "priority", "") or "0") in priorities:
+            search_text = task_attr(task, "summary").lower()
+            if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
+                print task_lookup.shortest(task_id), task_id, format_task(task)
+
+alias("listpri", "lsp")
+
 CONTEXT_RE = re.compile(r'(?:^|\s)(@\w*\b)')
 
 @app.cmd(help="Lists all the task contexts that start with the @ sign in task summaries")
@@ -176,7 +208,8 @@ def add(calendar_name, task):
     # organizer.value = "mailto:%s" % ACCOUNT_EMAIL_ADDRESS
     # organizer.params["CN"] = [ACCOUNT_FULL_NAME]
     # todo.add('percent-complete').value = "0"
-    # todo.add('priority').value = "5"
+    # priority 0 is undefined priority
+    todo.add('priority').value = "0"
     # todo.add('sequence').value = "0"
     todo.add('status').value = 'NEEDS-ACTION'
     todo.add('uid').value = uid = str(uuid.uuid1())
