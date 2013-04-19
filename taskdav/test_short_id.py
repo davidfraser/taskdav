@@ -24,6 +24,7 @@ def test_simple():
     assert sorted(indict.search("t")) == ["teach", "test"]
     assert sorted(indict.search("e")) == []
     assert raises(KeyError, indict.unique, "e")
+    assert raises(ValueError, indict.unique, "t")
     assert indict.unique("teach") == "you"
     assert indict.shortest("teach") == "tea"
     assert indict.shortest("pumpkin") == "pumpkin"

@@ -13,8 +13,10 @@ class prefix_dict(dict):
    def unique(self, prefix):
        """obtains the unique item starting with the given prefix - errors if search returns 0, 2 or more"""
        keys = self.search(prefix)
-       if len(keys) != 1:
-           raise KeyError("Could not distinguish between keys from %s: %s" % (prefix, ", ".join(keys)))
+       if len(keys) > 1:
+           raise ValueError("Could not distinguish between keys from %s: %s" % (prefix, ", ".join(keys)))
+       elif not keys:
+           raise KeyError("Could not find key starting with prefix %s" % prefix)
        return self[keys[0]]
 
    def shortest(self, key):
