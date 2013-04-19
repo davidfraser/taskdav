@@ -233,6 +233,17 @@ def addm(calendar_name, tasks):
 
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
+@app.cmd_arg('text', type=str, nargs='+', help="New summary text for the task")
+def replace(calendar_name, task_id, text):
+    text = " ".join(text)
+    task = client.get_task(calendar_name, task_id)
+    vtodo = task.instance.vtodo
+    vtodo.summary.value = text
+    task.save()
+    print task_id, task.id, format_task(task)
+
+@app.cmd
+@app.cmd_arg('task_id', type=str, help="ID of the task to amend")
 @app.cmd_arg('text', type=str, nargs='+', help="Extra text to append to the task")
 def append(calendar_name, task_id, text):
     text = " ".join(text)
