@@ -5,6 +5,7 @@ cfg = config.get_config()
 
 from datetime import datetime
 import caldav
+import re
 import urllib2
 import uuid
 import short_id
@@ -126,6 +127,22 @@ def listall(calendar_name, term):
             print task_lookup.shortest(task_id), task_id, format_task(task)
 
 alias("listall", "lsa")
+
+TASK_RE = re.compile(r'(?:^|\s)(@\w*\b)')
+
+@app.cmd(help="Lists all the task contexts that start with the @ sign in task summaries")
+def listcon(calendar_name):
+    task_lookup = client.get_tasks(calendar_name)
+    contexts = set()
+    for task_id in task_lookup:
+        task = client.get_task(calendar_name, task_id)
+        if task_attr(task, "status") != "COMPLETED":
+            summary = task_attr(task, "summary")
+            contexts.update(TASK_RE.findall(summary))
+    for context in sorted(contexts):
+        print context
+
+alias("listcon", "lsc")
 
 @app.cmd
 @app.cmd_arg('task', type=str, nargs='+', help="The description of the task")
