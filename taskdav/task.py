@@ -84,12 +84,26 @@ def format_task(task):
     gtav = lambda attrname: get_todo_attr_value(vtodo, attrname)
     return "%s %s %s" % ( gtav("status"), gtav("summary"), gtav("priority"))
 
-@app.cmd(name="list", help="List tasks")
-def list_(calendar_name):
+__NOT_FOUND = object()
+
+def attrs(obj, default, *attrs):
+    """looks up a sequence of attributes in sequence, returning the default if any of them are not found"""
+    for attr in attrs:
+        obj = getattr(obj, attr, __NOT_FOUND)
+        if obj is __NOT_FOUND:
+            return default
+    return obj
+
+@app.cmd(name="list", help="Displays all tasks containing the given search terms (if any) either as ID prefix or summary text")
+@app.cmd_arg('term', type=str, nargs='*', help="Search terms")
+def list_(calendar_name, term):
     task_lookup = client.get_tasks(calendar_name)
+    # TODO: make lookup by known ID not have to load all tasks
     for task_id in sorted(task_lookup):
-        task = task_lookup[task_id]
-        print task_lookup.shortest(task_id), task_id, format_task(task)
+        task = client.get_task(calendar_name, task_id)
+        search_text = attrs(task.instance, "", "vtodo", "summary", "value")
+        if all(task.id.startswith(t) or t in search_text for t in term):
+            print task_lookup.shortest(task_id), task_id, format_task(task)
 
 alias("list", "ls")
 
@@ -160,6 +174,7 @@ def depri(calendar_name, task_ids):
     for task_id in task_ids:
         task = client.get_task(calendar_name, task_id)
         vtodo = task.instance.vtodo
+        # TODO: this doesn't seem to correspond to priority on Thunderbird??
         if not hasattr(vtodo, "priority"):
             vtodo.add("priority").value = "5"
         else:
