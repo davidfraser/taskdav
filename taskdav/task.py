@@ -75,6 +75,12 @@ def alias(name, alias_name):
     parser_map = app._parser._subparsers._group_actions[0]._name_parser_map
     parser_map[alias_name] = parser_map[name]
 
+# priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low)
+PRIORITIES = [("A", 1), ("B", 2), ("C", 3), ("D", 4), ("", 5), ("", 0), ("E", 6), ("F", 7), ("G", 8), ("H", 9)]
+PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
+PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
+PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
+
 def get_todo_attr_value(vtodo, attrname):
     return getattr(getattr(vtodo, attrname, None), "value", None)
 
@@ -83,7 +89,8 @@ def format_task(task):
         task.load()
     vtodo = task.instance.vtodo
     gtav = lambda attrname: get_todo_attr_value(vtodo, attrname)
-    return "%s %s %s" % ( gtav("status"), gtav("summary"), gtav("priority"))
+    priority = PRIORITY_I2C[int(gtav("priority") or "0")]
+    return "%s%s %s" % (priority + " " if priority else "", gtav("summary"), gtav("status"))
 
 __NOT_FOUND = object()
 
@@ -127,11 +134,6 @@ def listall(calendar_name, term):
             print task_lookup.shortest(task_id), task_id, format_task(task)
 
 alias("listall", "lsa")
-
-# priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low)
-PRIORITIES = [("A", 1), ("B", 2), ("C", 3), ("D", 4), ("", 5), ("", 0), ("E", 6), ("F", 7), ("G", 8), ("H", 9)]
-PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
-PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
 
 @app.cmd(help="Displays all incomplete tasks of the given (or any) priority containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('priority', type=str, nargs='?', help="Priority")
