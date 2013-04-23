@@ -22,7 +22,7 @@ app.arg('-n', '--calendar-name', help="Name of the calendar to use", default="Ta
 
 def alias(name, alias_name):
     """Adds an alias to the given command name"""
-    # TODO: extend aaargh to handle this properly, so that it displays the aliases etc
+    # TODO: if https://github.com/wbolster/aaargh/pull/4 is accepted, replace this with alias= arguments
     parser_map = app._parser._subparsers._group_actions[0]._name_parser_map
     parser_map[alias_name] = parser_map[name]
 
@@ -32,28 +32,14 @@ PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
 PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
 PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
 
-__NOT_FOUND = object()
-
-def attrs(obj, default, *attrs):
-    """looks up a sequence of attributes in sequence, returning the default if any of them are not found"""
-    for attr in attrs:
-        obj = getattr(obj, attr, __NOT_FOUND)
-        if obj is __NOT_FOUND:
-            return default
-    return obj
-
-def task_attr(task, attrname, default=""):
-    """returns the given task's attribute by looking up task.instance.vtodo.[attrname].value"""
-    return attrs(task.instance, default, "vtodo", attrname, "value")
-
 def format_task(task):
     """Formats a task for output"""
     if not task.instance:
         task.load()
-    priority = PRIORITY_I2C[int(task_attr(task, "priority") or "0")]
-    status = task_attr(task, "status")
+    priority = PRIORITY_I2C[int(task.todo_attr("priority") or "0")]
+    status = task.todo_attr("status")
     status_str = ("x " if status == "COMPLETED" else "") + (priority + " " if priority else "")
-    return "%s%s %s" % (status_str, task_attr(task, "summary"), task_attr(task, "status"))
+    return "%s%s %s" % (status_str, task.todo_attr("summary"), task.todo_attr("status"))
 
 @app.cmd(name="list", help="Displays all incomplete tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
@@ -63,8 +49,8 @@ def list_(calendar_name, term):
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        if task_attr(task, "status") != "COMPLETED":
-            search_text = task_attr(task, "summary").lower()
+        if task.todo_attr("status") != "COMPLETED":
+            search_text = task.todo_attr("summary").lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
                 print task_lookup.shortest(task_id), format_task(task)
 
@@ -78,7 +64,7 @@ def listall(calendar_name, term):
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        search_text = task_attr(task, "summary").lower()
+        search_text = task.todo_attr("summary").lower()
         if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
             print task_lookup.shortest(task_id), format_task(task)
 
@@ -91,7 +77,7 @@ def report(calendar_name):
     task_status_count = {}
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        status = task_attr(task, "status")
+        status = task.todo_attr("status")
         task_status_count[status] = task_status_count.get(status, 0) + 1
     print date
     for status in sorted(task_status_count):
@@ -117,8 +103,8 @@ def listpri(calendar_name, priority, term):
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        if task_attr(task, "status") != "COMPLETED" and int(task_attr(task, "priority", "") or "0") in priorities:
-            search_text = task_attr(task, "summary").lower()
+        if task.todo_attr("status") != "COMPLETED" and int(task.todo_attr("priority", "") or "0") in priorities:
+            search_text = task.todo_attr("summary").lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
                 print task_lookup.shortest(task_id), format_task(task)
 
@@ -132,8 +118,8 @@ def listcon(calendar_name):
     contexts = set()
     for task_id in task_lookup:
         task = client.get_task(calendar_name, task_id)
-        if task_attr(task, "status") != "COMPLETED":
-            summary = task_attr(task, "summary")
+        if task.todo_attr("status") != "COMPLETED":
+            summary = task.todo_attr("summary")
             contexts.update(CONTEXT_RE.findall(summary))
     for context in sorted(contexts):
         print context
@@ -148,8 +134,8 @@ def listproj(calendar_name):
     projects = set()
     for task_id in task_lookup:
         task = client.get_task(calendar_name, task_id)
-        if task_attr(task, "status") != "COMPLETED":
-            summary = task_attr(task, "summary")
+        if task.todo_attr("status") != "COMPLETED":
+            summary = task.todo_attr("summary")
             projects.update(PROJ_RE.findall(summary))
     for project in sorted(projects):
         print project

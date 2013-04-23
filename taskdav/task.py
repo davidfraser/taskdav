@@ -10,6 +10,15 @@ def get_object_urlname(davobject):
     name = name if "/" not in name else name[name.rfind("/")+1:]
     return urllib2.unquote(name)
 
+class Task(caldav.Event):
+    def todo_attr(self, attr_name, default=""):
+        """Returns the attribute from self.instance.vtodo with the given name's value, or default if not present"""
+        if not self.instance:
+            self.load()
+        vtodo = self.instance.vtodo
+        obj = getattr(vtodo, attr_name, None)
+        return obj.value if obj is not None else default
+
 class TaskDAVClient(caldav.DAVClient):
     """Client that knows about tasks"""
     def __init__(self, url):
@@ -36,7 +45,9 @@ class TaskDAVClient(caldav.DAVClient):
         self.calendar_tasks[calendar_name] = tasks = short_id.prefix_dict()
         for task in self.get_calendar(calendar_name).events():
             task_id = task.id or (get_object_urlname(task).replace(".ics", ""))
-            tasks[task_id] = task
+            # TODO: just use task.url once patch accepted
+            url = task.url.geturl() if task.url is not None else None
+            tasks[task_id] = task = Task(task.client, url=url, data=task.data, parent=task.parent, id=task.id)
 
     def get_tasks(self, calendar_name):
         if not calendar_name in self.calendar_tasks:
