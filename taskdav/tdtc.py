@@ -72,18 +72,12 @@ def report(calendar_name):
 @app.cmd_arg('priority', type=str, nargs='?', help="Priority")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
 def listpri(calendar_name, priority, term):
-    if priority and not Task.PRIORITY_RE.match(priority):
+    try:
+        priorities = Task.parse_priority_range(priority)
+    except ValueError:
+        # Assume this wasn't really a priority
         term.insert(0, priority)
-        priority = None
-    if priority:
-        priority = priority.upper()
-        if "-" in priority:
-            start_i, stop_i = Task.PRIORITY_C2I[priority[0]], Task.PRIORITY_C2I[priority[2]]
-            priorities = {pi for pc, pi in Task.PRIORITIES if start_i <= pi <= stop_i and pc}
-        else:
-            priorities = {Task.PRIORITY_C2I[priority]}
-    else:
-        priorities = {pi for pc, pi in Task.PRIORITIES if pc}
+        priorities = Task.ALL_PRIORITIES
     task_lookup = client.get_tasks(calendar_name)
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
@@ -226,7 +220,7 @@ alias("rm", "del")
 def pri(calendar_name, priority, task_id):
     task = client.get_task(calendar_name, task_id)
     vtodo = task.instance.vtodo
-    priority = str(task.PRIORITY_C2I[priority])
+    priority = task.parse_priority(priority)
     if not hasattr(vtodo, "priority"):
         vtodo.add("priority").value = priority
     else:

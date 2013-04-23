@@ -17,6 +17,31 @@ class Task(caldav.Event):
     PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
     PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
     PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
+    ALL_PRIORITIES = {pi for pc, pi in PRIORITIES if pc}
+
+    @classmethod
+    def parse_priority_range(cls, priority_str):
+        """Parses the given priority_str which can be either a single priority `C` or a range `B-E`, and return a set of caldav priority values"""
+        if priority_str:
+            if not cls.PRIORITY_RE.match(priority_str):
+                raise ValueError("Priority range expression is not valid: %s" % priority_str)
+            priority_str = priority_str.upper()
+            if "-" in priority_str:
+                start_i, stop_i = cls.PRIORITY_C2I[priority_str[0]], cls.PRIORITY_C2I[priority_str[2]]
+                return {pi for pc, pi in cls.PRIORITIES if start_i <= pi <= stop_i and pc}
+            else:
+                return {cls.PRIORITY_C2I[priority_str]}
+        else:
+            return cls.ALL_PRIORITIES
+
+    @classmethod
+    def parse_priority(cls, priority_str):
+        """Parses the given priority_str which must be a single priority `C`, and return a caldav priority value"""
+        if priority_str:
+            priority_str = priority_str.upper()
+            return cls.PRIORITY_C2I[priority_str]
+        else:
+            return None
 
     def todo_attr(self, attr_name, default=""):
         """Returns the attribute from self.instance.vtodo with the given name's value, or default if not present"""
