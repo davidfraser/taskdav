@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import caldav
+import re
 import urllib2
 import short_id
 
@@ -11,6 +12,12 @@ def get_object_urlname(davobject):
     return urllib2.unquote(name)
 
 class Task(caldav.Event):
+    # priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low)
+    PRIORITIES = [("A", 1), ("B", 2), ("C", 3), ("D", 4), ("", 5), ("", 0), ("E", 6), ("F", 7), ("G", 8), ("H", 9)]
+    PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
+    PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
+    PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
+
     def todo_attr(self, attr_name, default=""):
         """Returns the attribute from self.instance.vtodo with the given name's value, or default if not present"""
         if not self.instance:
@@ -18,6 +25,15 @@ class Task(caldav.Event):
         vtodo = self.instance.vtodo
         obj = getattr(vtodo, attr_name, None)
         return obj.value if obj is not None else default
+
+    def format(self):
+        """Formats a task for output"""
+        if not self.instance:
+            self.load()
+        priority = self.PRIORITY_I2C[int(self.todo_attr("priority") or "0")]
+        status = self.todo_attr("status")
+        status_str = ("x " if status == "COMPLETED" else "") + (priority + " " if priority else "")
+        return "%s%s %s" % (status_str, self.todo_attr("summary"), self.todo_attr("status"))
 
 class TaskDAVClient(caldav.DAVClient):
     """Client that knows about tasks"""

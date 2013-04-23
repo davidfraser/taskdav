@@ -2,7 +2,7 @@
 
 """todo.txt command-line compatibility - implements many commands from todo.txt"""
 
-from taskdav import task
+from taskdav.task import Task, TaskDAVClient
 from datetime import datetime
 import caldav
 import re
@@ -12,7 +12,7 @@ import config
 
 cfg = config.get_config()
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
-client = task.TaskDAVClient(url)
+client = TaskDAVClient(url)
 
 utc = caldav.vobject.icalendar.utc
 
@@ -26,21 +26,6 @@ def alias(name, alias_name):
     parser_map = app._parser._subparsers._group_actions[0]._name_parser_map
     parser_map[alias_name] = parser_map[name]
 
-# priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low)
-PRIORITIES = [("A", 1), ("B", 2), ("C", 3), ("D", 4), ("", 5), ("", 0), ("E", 6), ("F", 7), ("G", 8), ("H", 9)]
-PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
-PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
-PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
-
-def format_task(task):
-    """Formats a task for output"""
-    if not task.instance:
-        task.load()
-    priority = PRIORITY_I2C[int(task.todo_attr("priority") or "0")]
-    status = task.todo_attr("status")
-    status_str = ("x " if status == "COMPLETED" else "") + (priority + " " if priority else "")
-    return "%s%s %s" % (status_str, task.todo_attr("summary"), task.todo_attr("status"))
-
 @app.cmd(name="list", help="Displays all incomplete tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
 def list_(calendar_name, term):
@@ -52,7 +37,7 @@ def list_(calendar_name, term):
         if task.todo_attr("status") != "COMPLETED":
             search_text = task.todo_attr("summary").lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
-                print task_lookup.shortest(task_id), format_task(task)
+                print task_lookup.shortest(task_id), task.format()
 
 alias("list", "ls")
 
@@ -66,7 +51,7 @@ def listall(calendar_name, term):
         task = client.get_task(calendar_name, task_id)
         search_text = task.todo_attr("summary").lower()
         if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
-            print task_lookup.shortest(task_id), format_task(task)
+            print task_lookup.shortest(task_id), task.format()
 
 alias("listall", "lsa")
 
@@ -87,18 +72,18 @@ def report(calendar_name):
 @app.cmd_arg('priority', type=str, nargs='?', help="Priority")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
 def listpri(calendar_name, priority, term):
-    if priority and not PRIORITY_RE.match(priority):
+    if priority and not Task.PRIORITY_RE.match(priority):
         term.insert(0, priority)
         priority = None
     if priority:
         priority = priority.upper()
         if "-" in priority:
-            start_i, stop = PRIORITY_C2I[priority[0]], PRIORITY_C2I[priority[2]]
-            priorities = {pi for pc, pi in PRIORITIES if start_i <= pi <= stop_i and pc}
+            start_i, stop_i = Task.PRIORITY_C2I[priority[0]], Task.PRIORITY_C2I[priority[2]]
+            priorities = {pi for pc, pi in Task.PRIORITIES if start_i <= pi <= stop_i and pc}
         else:
-            priorities = {PRIORITY_C2I[priority]}
+            priorities = {Task.PRIORITY_C2I[priority]}
     else:
-        priorities = {pi for pc, pi in PRIORITIES if pc}
+        priorities = {pi for pc, pi in Task.PRIORITIES if pc}
     task_lookup = client.get_tasks(calendar_name)
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
@@ -106,7 +91,7 @@ def listpri(calendar_name, priority, term):
         if task.todo_attr("status") != "COMPLETED" and int(task.todo_attr("priority", "") or "0") in priorities:
             search_text = task.todo_attr("summary").lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
-                print task_lookup.shortest(task_id), format_task(task)
+                print task_lookup.shortest(task_id), task.format()
 
 alias("listpri", "lsp")
 
@@ -170,7 +155,7 @@ def add(calendar_name, text):
         print "Error saving event: %r" % e
     task_lookup = client.get_tasks(calendar_name)
     task_lookup[uid] = task
-    print task_lookup.shortest(uid), format_task(task)
+    print task_lookup.shortest(uid), task.format()
 
 alias("add", "a")
 
@@ -191,7 +176,7 @@ def replace(calendar_name, task_id, text):
     vtodo.summary.value = text
     task.save()
     task_lookup = client.get_tasks(calendar_name)
-    print task_lookup.shortest(task_id), format_task(task)
+    print task_lookup.shortest(task_id), task.format()
 
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
@@ -203,7 +188,7 @@ def append(calendar_name, task_id, text):
     vtodo.summary.value = vtodo.summary.value.rstrip(" ") + " " + text
     task.save()
     task_lookup = client.get_tasks(calendar_name)
-    print task_lookup.shortest(task_id), format_task(task)
+    print task_lookup.shortest(task_id), task.format()
 
 alias("append", "app")
 
@@ -217,7 +202,7 @@ def prepend(calendar_name, task_id, text):
     vtodo.summary.value = text + " " + vtodo.summary.value.lstrip(" ")
     task.save()
     task_lookup = client.get_tasks(calendar_name)
-    print task_lookup.shortest(task_id), format_task(task)
+    print task_lookup.shortest(task_id), task.format()
 
 alias("prepend", "prep")
 
@@ -226,7 +211,7 @@ alias("prepend", "prep")
 def rm(calendar_name, task_id):
     task = client.get_task(calendar_name, task_id)
     task_lookup = client.get_tasks(calendar_name)
-    print task_lookup.shortest(task_id), format_task(task)
+    print task_lookup.shortest(task_id), task.format()
     answer = ""
     while answer not in {"y", "n"}:
         answer = raw_input("delete (y/n)").lower()
@@ -241,14 +226,14 @@ alias("rm", "del")
 def pri(calendar_name, priority, task_id):
     task = client.get_task(calendar_name, task_id)
     vtodo = task.instance.vtodo
-    priority = str(PRIORITY_C2I[priority])
+    priority = str(task.PRIORITY_C2I[priority])
     if not hasattr(vtodo, "priority"):
         vtodo.add("priority").value = priority
     else:
         vtodo.priority.value = priority
     task.save()
     task_lookup = client.get_tasks(calendar_name)
-    print task_lookup.shortest(task_id), format_task(task)
+    print task_lookup.shortest(task_id), task.format()
 
 alias("pri", "p")
 
@@ -265,7 +250,7 @@ def depri(calendar_name, task_ids):
         else:
             vtodo.priority.value = "0"
         task.save()
-        print task_lookup.shortest(task_id), format_task(task)
+        print task_lookup.shortest(task_id), task.format()
 
 alias("depri", "dp")
 
@@ -283,7 +268,7 @@ def do(calendar_name, task_ids):
         if hasattr(vtodo, "percent_complete"):
             vtodo.percent_complete.value = "100"
         task.save()
-        print task_lookup.shortest(task_id), format_task(task)
+        print task_lookup.shortest(task_id), task.format()
 
 if __name__ == "__main__":
     app.run()
