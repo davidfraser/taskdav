@@ -222,9 +222,9 @@ def pri(calendar_name, priority, task_id):
     vtodo = task.instance.vtodo
     priority = task.parse_priority(priority)
     if not hasattr(vtodo, "priority"):
-        vtodo.add("priority").value = priority
+        vtodo.add("priority").value = str(priority)
     else:
-        vtodo.priority.value = priority
+        vtodo.priority.value = str(priority)
     task.save()
     task_lookup = client.get_tasks(calendar_name)
     print task_lookup.shortest(task_id), task.format()
