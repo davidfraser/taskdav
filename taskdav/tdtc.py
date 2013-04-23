@@ -215,9 +215,9 @@ def rm(calendar_name, task_id):
 alias("rm", "del")
 
 @app.cmd
-@app.cmd_arg('priority', type=str, help="Priority")
 @app.cmd_arg('task_id', type=str, help="ID of the task to prioritize")
-def pri(calendar_name, priority, task_id):
+@app.cmd_arg('priority', type=str, help="Priority")
+def pri(calendar_name, task_id, priority):
     task = client.get_task(calendar_name, task_id)
     vtodo = task.instance.vtodo
     priority = task.parse_priority(priority)
