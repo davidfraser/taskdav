@@ -51,6 +51,16 @@ class Task(caldav.Event):
         obj = getattr(vtodo, attr_name, None)
         return obj.value if obj is not None else default
 
+    def todo_setattr(self, attr_name, value):
+        """sets the attribute from self.instance.vtodo to the given value"""
+        if not self.instance:
+            self.load()
+        vtodo = self.instance.vtodo
+        if not hasattr(vtodo, attr_name):
+            vtodo.add(attr_name).value = value
+        else:
+            vtodo.attr_name.value = value
+
     def format(self):
         """Formats a task for output"""
         if not self.instance:

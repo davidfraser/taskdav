@@ -166,8 +166,7 @@ def addm(calendar_name, tasks):
 def replace(calendar_name, task_id, text):
     text = " ".join(text)
     task = client.get_task(calendar_name, task_id)
-    vtodo = task.instance.vtodo
-    vtodo.summary.value = text
+    task.todo_setattr("summary", text)
     task.save()
     task_lookup = client.get_tasks(calendar_name)
     print task_lookup.shortest(task_id), task.format()
@@ -178,8 +177,7 @@ def replace(calendar_name, task_id, text):
 def append(calendar_name, task_id, text):
     text = " ".join(text)
     task = client.get_task(calendar_name, task_id)
-    vtodo = task.instance.vtodo
-    vtodo.summary.value = vtodo.summary.value.rstrip(" ") + " " + text
+    task.todo_setattr("summary", task.todo_getattr("summary", "").rstrip(" ") + " " + text)
     task.save()
     task_lookup = client.get_tasks(calendar_name)
     print task_lookup.shortest(task_id), task.format()
@@ -192,8 +190,7 @@ alias("append", "app")
 def prepend(calendar_name, task_id, text):
     text = " ".join(text)
     task = client.get_task(calendar_name, task_id)
-    vtodo = task.instance.vtodo
-    vtodo.summary.value = text + " " + vtodo.summary.value.lstrip(" ")
+    task.todo_setattr("summary", text + " " + task.todo_getattr("summary", "").lstrip(" "))
     task.save()
     task_lookup = client.get_tasks(calendar_name)
     print task_lookup.shortest(task_id), task.format()
@@ -219,12 +216,8 @@ alias("rm", "del")
 @app.cmd_arg('priority', type=str, help="Priority")
 def pri(calendar_name, task_id, priority):
     task = client.get_task(calendar_name, task_id)
-    vtodo = task.instance.vtodo
     priority = task.parse_priority(priority)
-    if not hasattr(vtodo, "priority"):
-        vtodo.add("priority").value = str(priority)
-    else:
-        vtodo.priority.value = str(priority)
+    task.todo_setattr("priority", str(priority))
     task.save()
     task_lookup = client.get_tasks(calendar_name)
     print task_lookup.shortest(task_id), task.format()
@@ -237,12 +230,7 @@ def depri(calendar_name, task_ids):
     task_lookup = client.get_tasks(calendar_name)
     for task_id in task_ids:
         task = client.get_task(calendar_name, task_id)
-        vtodo = task.instance.vtodo
-        # TODO: this doesn't seem to correspond to priority on Thunderbird??
-        if not hasattr(vtodo, "priority"):
-            vtodo.add("priority").value = "0"
-        else:
-            vtodo.priority.value = "0"
+        task.todo_setattr("priority", "0")
         task.save()
         print task_lookup.shortest(task_id), task.format()
 
@@ -254,13 +242,8 @@ def do(calendar_name, task_ids):
     task_lookup = client.get_tasks(calendar_name)
     for task_id in task_ids:
         task = client.get_task(calendar_name, task_id)
-        vtodo = task.instance.vtodo
-        if not hasattr(vtodo, "status"):
-            vtodo.add("status").value = "COMPLETED"
-        else:
-            vtodo.status.value = "COMPLETED"
-        if hasattr(vtodo, "percent_complete"):
-            vtodo.percent_complete.value = "100"
+        task.todo_setattr("status", "COMPLETED")
+        task.todo_setattr("percent_complete", "100")
         task.save()
         print task_lookup.shortest(task_id), task.format()
 
