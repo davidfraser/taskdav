@@ -61,6 +61,35 @@ class Task(caldav.Event):
         else:
             vtodo.attr_name.value = value
 
+    @property
+    def status(self):
+        """Returns the current status"""
+        return self.todo_getattr("status", None)
+
+    @status.setter
+    def status(self, value):
+        self.todo_setattr("status", value)
+
+    @property
+    def priority(self):
+        """Returns the current priority as an integer"""
+        return int(self.todo_getattr("priority", "0"))
+
+    @priority.setter
+    def priority(self, value):
+        if not isinstance(value, int):
+            value = int(value or "0")
+        self.todo_setattr("priority", value)
+
+    @property
+    def summary(self):
+        """Returns the current summary"""
+        return self.todo_getattr("summary", "")
+
+    @summary.setter
+    def summary(self, value):
+        self.todo_setattr("summary", value)
+
     def format(self):
         """Formats a task for output"""
         if not self.instance:

@@ -34,8 +34,8 @@ def list_(calendar_name, term):
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        if task.todo_getattr("status") != "COMPLETED":
-            search_text = task.todo_getattr("summary").lower()
+        if task.status != "COMPLETED":
+            search_text = task.summary.lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
                 print task_lookup.shortest(task_id), task.format()
 
@@ -49,7 +49,7 @@ def listall(calendar_name, term):
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        search_text = task.todo_getattr("summary").lower()
+        search_text = task.summary.lower()
         if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
             print task_lookup.shortest(task_id), task.format()
 
@@ -62,7 +62,7 @@ def report(calendar_name):
     task_status_count = {}
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        status = task.todo_getattr("status")
+        status = task.status
         task_status_count[status] = task_status_count.get(status, 0) + 1
     print date
     for status in sorted(task_status_count):
@@ -82,8 +82,8 @@ def listpri(calendar_name, priority, term):
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        if task.todo_getattr("status") != "COMPLETED" and int(task.todo_getattr("priority", "") or "0") in priorities:
-            search_text = task.todo_getattr("summary").lower()
+        if task.status != "COMPLETED" and task.priority in priorities:
+            search_text = task.summary.lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
                 print task_lookup.shortest(task_id), task.format()
 
@@ -97,9 +97,8 @@ def listcon(calendar_name):
     contexts = set()
     for task_id in task_lookup:
         task = client.get_task(calendar_name, task_id)
-        if task.todo_getattr("status") != "COMPLETED":
-            summary = task.todo_getattr("summary")
-            contexts.update(CONTEXT_RE.findall(summary))
+        if task.status != "COMPLETED":
+            contexts.update(CONTEXT_RE.findall(task.summary))
     for context in sorted(contexts):
         print context
 
@@ -113,9 +112,8 @@ def listproj(calendar_name):
     projects = set()
     for task_id in task_lookup:
         task = client.get_task(calendar_name, task_id)
-        if task.todo_getattr("status") != "COMPLETED":
-            summary = task.todo_getattr("summary")
-            projects.update(PROJ_RE.findall(summary))
+        if task.status != "COMPLETED":
+            projects.update(PROJ_RE.findall(task.summary))
     for project in sorted(projects):
         print project
 
@@ -138,9 +136,9 @@ def add(calendar_name, text):
     # organizer.params["CN"] = [ACCOUNT_FULL_NAME]
     # todo.add('percent-complete').value = "0"
     # priority 0 is undefined priority
-    todo.add('priority').value = "0"
+    todo.priority = 0
     # todo.add('sequence').value = "0"
-    todo.add('status').value = 'NEEDS-ACTION'
+    todo.status = 'NEEDS-ACTION'
     todo.add('uid').value = uid = str(uuid.uuid4())
     try:
         task = caldav.Event(client, data=cal.serialize(), parent=client.get_calendar(calendar_name), id=uid)
@@ -166,7 +164,7 @@ def addm(calendar_name, tasks):
 def replace(calendar_name, task_id, text):
     text = " ".join(text)
     task = client.get_task(calendar_name, task_id)
-    task.todo_setattr("summary", text)
+    task.summary = text
     task.save()
     task_lookup = client.get_tasks(calendar_name)
     print task_lookup.shortest(task_id), task.format()
@@ -177,7 +175,7 @@ def replace(calendar_name, task_id, text):
 def append(calendar_name, task_id, text):
     text = " ".join(text)
     task = client.get_task(calendar_name, task_id)
-    task.todo_setattr("summary", task.todo_getattr("summary", "").rstrip(" ") + " " + text)
+    task.summary = task.summary.rstrip(" ") + " " + text
     task.save()
     task_lookup = client.get_tasks(calendar_name)
     print task_lookup.shortest(task_id), task.format()
@@ -190,7 +188,7 @@ alias("append", "app")
 def prepend(calendar_name, task_id, text):
     text = " ".join(text)
     task = client.get_task(calendar_name, task_id)
-    task.todo_setattr("summary", text + " " + task.todo_getattr("summary", "").lstrip(" "))
+    task.summary = text + " " + task.summary.lstrip(" ")
     task.save()
     task_lookup = client.get_tasks(calendar_name)
     print task_lookup.shortest(task_id), task.format()
@@ -216,8 +214,7 @@ alias("rm", "del")
 @app.cmd_arg('priority', type=str, help="Priority")
 def pri(calendar_name, task_id, priority):
     task = client.get_task(calendar_name, task_id)
-    priority = task.parse_priority(priority)
-    task.todo_setattr("priority", str(priority))
+    task.priority = task.parse_priority(priority)
     task.save()
     task_lookup = client.get_tasks(calendar_name)
     print task_lookup.shortest(task_id), task.format()
@@ -230,7 +227,7 @@ def depri(calendar_name, task_ids):
     task_lookup = client.get_tasks(calendar_name)
     for task_id in task_ids:
         task = client.get_task(calendar_name, task_id)
-        task.todo_setattr("priority", "0")
+        task.priority = 0
         task.save()
         print task_lookup.shortest(task_id), task.format()
 
@@ -242,7 +239,7 @@ def do(calendar_name, task_ids):
     task_lookup = client.get_tasks(calendar_name)
     for task_id in task_ids:
         task = client.get_task(calendar_name, task_id)
-        task.todo_setattr("status", "COMPLETED")
+        task.status = "COMPLETED"
         task.todo_setattr("percent_complete", "100")
         task.save()
         print task_lookup.shortest(task_id), task.format()
