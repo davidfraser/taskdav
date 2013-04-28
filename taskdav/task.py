@@ -20,6 +20,28 @@ class Task(caldav.Event):
     ALL_PRIORITIES = {pi for pc, pi in PRIORITIES if pc}
 
     @classmethod
+    def new_task(cls, client, parent, summary, **attrs):
+        """constructs a new task on the given client and parent calendar with the given summary and other attrs, defaulting to sensible defaults otherwise"""
+        cal = caldav.vobject.iCalendar()
+        todo = cal.add('vtodo')
+        default_date = datetime.utcnow().replace(tzinfo=utc)
+        todo.add('class').value = attrs.get('class', 'PUBLIC')
+        todo.add('summary').value = summary
+        todo.add('created').value = attrs.get('created', date)
+        todo.add('dtstamp').value = attrs.get('dtstamp', date)
+        todo.add('last-modified').value = attrs.get('last-modified', date)
+        # organizer = todo.add('organizer')
+        # organizer.value = "mailto:%s" % ACCOUNT_EMAIL_ADDRESS
+        # organizer.params["CN"] = [ACCOUNT_FULL_NAME]
+        # todo.add('percent-complete').value = "0"
+        # priority 0 is undefined priority
+        todo.add('priority').value = "0"
+        # todo.add('sequence').value = "0"
+        todo.add('status').value = 'NEEDS-ACTION'
+        todo.add('uid').value = uid = attrs.get('uid', str(uuid.uuid4()))
+        return cls(client, data=cal.serialize(), parent=parent, id=uid)
+
+    @classmethod
     def parse_priority_range(cls, priority_str):
         """Parses the given priority_str which can be either a single priority `C` or a range `B-E`, and return a set of caldav priority values"""
         if priority_str:

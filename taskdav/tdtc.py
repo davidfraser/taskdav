@@ -123,31 +123,14 @@ alias("listproj", "lsprj")
 @app.cmd_arg('text', type=str, nargs='+', help="The description of the task")
 def add(calendar_name, text):
     text = " ".join(text)
-    cal = caldav.vobject.iCalendar()
-    todo = cal.add('vtodo')
-    date = datetime.utcnow().replace(tzinfo=utc)
-    todo.add('class').value = 'PUBLIC'
-    todo.add('summary').value = text
-    todo.add('created').value = date
-    todo.add('dtstamp').value = date
-    todo.add('last-modified').value = date
-    # organizer = todo.add('organizer')
-    # organizer.value = "mailto:%s" % ACCOUNT_EMAIL_ADDRESS
-    # organizer.params["CN"] = [ACCOUNT_FULL_NAME]
-    # todo.add('percent-complete').value = "0"
-    # priority 0 is undefined priority
-    todo.priority = 0
-    # todo.add('sequence').value = "0"
-    todo.status = 'NEEDS-ACTION'
-    todo.add('uid').value = uid = str(uuid.uuid4())
     try:
-        task = caldav.Event(client, data=cal.serialize(), parent=client.get_calendar(calendar_name), id=uid)
+        task = Task.new_task(client, parent=client.get_calendar(calendar_name), summary=text)
         task.save()
     except Exception, e:
         print "Error saving event: %r" % e
     task_lookup = client.get_tasks(calendar_name)
-    task_lookup[uid] = task
-    print task_lookup.shortest(uid), task.format()
+    task_lookup[task.id] = task
+    print task_lookup.shortest(task.id), task.format()
 
 alias("add", "a")
 
