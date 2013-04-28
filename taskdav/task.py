@@ -43,7 +43,7 @@ class Task(caldav.Event):
         else:
             return None
 
-    def todo_attr(self, attr_name, default=""):
+    def todo_getattr(self, attr_name, default=""):
         """Returns the attribute from self.instance.vtodo with the given name's value, or default if not present"""
         if not self.instance:
             self.load()
@@ -55,10 +55,10 @@ class Task(caldav.Event):
         """Formats a task for output"""
         if not self.instance:
             self.load()
-        priority = self.PRIORITY_I2C[int(self.todo_attr("priority") or "0")]
-        status = self.todo_attr("status")
+        priority = self.PRIORITY_I2C[int(self.todo_getattr("priority") or "0")]
+        status = self.todo_getattr("status")
         status_str = ("x " if status == "COMPLETED" else "") + (priority + " " if priority else "")
-        return "%s%s %s" % (status_str, self.todo_attr("summary"), self.todo_attr("status"))
+        return "%s%s %s" % (status_str, self.todo_getattr("summary"), self.todo_getattr("status"))
 
 class TaskDAVClient(caldav.DAVClient):
     """Client that knows about tasks"""

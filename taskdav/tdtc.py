@@ -34,8 +34,8 @@ def list_(calendar_name, term):
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        if task.todo_attr("status") != "COMPLETED":
-            search_text = task.todo_attr("summary").lower()
+        if task.todo_getattr("status") != "COMPLETED":
+            search_text = task.todo_getattr("summary").lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
                 print task_lookup.shortest(task_id), task.format()
 
@@ -49,7 +49,7 @@ def listall(calendar_name, term):
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        search_text = task.todo_attr("summary").lower()
+        search_text = task.todo_getattr("summary").lower()
         if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
             print task_lookup.shortest(task_id), task.format()
 
@@ -62,7 +62,7 @@ def report(calendar_name):
     task_status_count = {}
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        status = task.todo_attr("status")
+        status = task.todo_getattr("status")
         task_status_count[status] = task_status_count.get(status, 0) + 1
     print date
     for status in sorted(task_status_count):
@@ -82,8 +82,8 @@ def listpri(calendar_name, priority, term):
     term = [t.lower() for t in term]
     for task_id in sorted(task_lookup):
         task = client.get_task(calendar_name, task_id)
-        if task.todo_attr("status") != "COMPLETED" and int(task.todo_attr("priority", "") or "0") in priorities:
-            search_text = task.todo_attr("summary").lower()
+        if task.todo_getattr("status") != "COMPLETED" and int(task.todo_getattr("priority", "") or "0") in priorities:
+            search_text = task.todo_getattr("summary").lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
                 print task_lookup.shortest(task_id), task.format()
 
@@ -97,8 +97,8 @@ def listcon(calendar_name):
     contexts = set()
     for task_id in task_lookup:
         task = client.get_task(calendar_name, task_id)
-        if task.todo_attr("status") != "COMPLETED":
-            summary = task.todo_attr("summary")
+        if task.todo_getattr("status") != "COMPLETED":
+            summary = task.todo_getattr("summary")
             contexts.update(CONTEXT_RE.findall(summary))
     for context in sorted(contexts):
         print context
@@ -113,8 +113,8 @@ def listproj(calendar_name):
     projects = set()
     for task_id in task_lookup:
         task = client.get_task(calendar_name, task_id)
-        if task.todo_attr("status") != "COMPLETED":
-            summary = task.todo_attr("summary")
+        if task.todo_getattr("status") != "COMPLETED":
+            summary = task.todo_getattr("summary")
             projects.update(PROJ_RE.findall(summary))
     for project in sorted(projects):
         print project
