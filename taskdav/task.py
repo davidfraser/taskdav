@@ -121,12 +121,18 @@ class Task(caldav.Event):
         status_str = ("x " if status == "COMPLETED" else "") + (priority + " " if priority else "")
         return "%s%s %s" % (status_str, self.todo_getattr("summary"), self.todo_getattr("status"))
 
+class TaskList(caldav.Calendar):
+    event_cls = Task
+
+class TaskPrincipal(caldav.Principal):
+    calendar_cls = TaskList
+
 class TaskDAVClient(caldav.DAVClient):
     """Client that knows about tasks"""
     def __init__(self, url):
         caldav.DAVClient.__init__(self, url)
         # cache a principal we can use
-        self.principal = caldav.Principal(self, url)
+        self.principal = TaskPrincipal(self, url)
         self.calendar_lookup = {}
         self.calendar_tasks = {}
 
@@ -144,12 +150,11 @@ class TaskDAVClient(caldav.DAVClient):
         return self.calendar_lookup[calendar_name]
 
     def cache_tasks(self, calendar_name):
+        # TODO: move this into TaskList
         self.calendar_tasks[calendar_name] = tasks = short_id.prefix_dict()
         for task in self.get_calendar(calendar_name).events():
             task_id = task.id or (get_object_urlname(task).replace(".ics", ""))
-            # TODO: just use task.url once patch accepted
-            url = task.url.geturl() if task.url is not None else None
-            tasks[task_id] = task = Task(task.client, url=url, data=task.data, parent=task.parent, id=task.id)
+            tasks[task_id] = task
 
     def get_tasks(self, calendar_name):
         if not calendar_name in self.calendar_tasks:
