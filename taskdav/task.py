@@ -6,8 +6,12 @@ import urlparse
 import urllib2
 import short_id
 from lxml import etree
-from caldav.elements import cdav, dav
+from caldav.elements import base, cdav, dav
 from caldav.lib import error, url
+from caldav.lib.namespace import ns
+
+class GetEtag(base.BaseElement):
+    tag = ns("D", "getetag")
 
 def get_object_urlname(davobject):
     """Returns the last component of the url path as the object's name"""
@@ -22,6 +26,10 @@ class Task(caldav.Event):
     PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
     PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
     ALL_PRIORITIES = {pi for pc, pi in PRIORITIES if pc}
+
+    def __init__(self, client, url=None, data=None, parent=None, id=None, etag=None):
+        caldav.Event.__init__(self, client, url, data, parent, id)
+        self.etag = etag
 
     @classmethod
     def new_task(cls, client, parent, summary, **attrs):
@@ -141,8 +149,9 @@ class TaskList(caldav.Calendar):
         matches = []
 
         # build the request
+        getetag = GetEtag()
         data = cdav.CalendarData()
-        prop = dav.Prop() + data
+        prop = dav.Prop() + [getetag, data]
 
         vevent = cdav.CompFilter("VTODO")
         vcal = cdav.CompFilter("VCALENDAR") + vevent
@@ -159,7 +168,8 @@ class TaskList(caldav.Calendar):
                 href = urlparse.urlparse(r.find(dav.Href.tag).text)
                 href = url.canonicalize(href, self)
                 data = r.find(".//" + cdav.CalendarData.tag).text
-                e = self.event_cls(self.client, url=href, data=data, parent=self)
+                etag = r.find(".//" + GetEtag.tag).text
+                e = self.event_cls(self.client, url=href, data=data, parent=self, etag=etag)
                 matches.append(e)
             else:
                 raise error.ReportError(response.raw)
