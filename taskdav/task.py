@@ -2,13 +2,17 @@
 
 import caldav
 import re
+import uuid
 import urlparse
 import urllib2
 import short_id
+from datetime import datetime
 from lxml import etree
 from caldav.elements import base, cdav, dav
 from caldav.lib import error, vcal, url
 from caldav.lib.namespace import ns
+
+utc = caldav.vobject.icalendar.utc
 
 class GetEtag(base.BaseElement):
     tag = ns("D", "getetag")
@@ -49,9 +53,9 @@ class Task(caldav.Event):
         default_date = datetime.utcnow().replace(tzinfo=utc)
         todo.add('class').value = attrs.get('class', 'PUBLIC')
         todo.add('summary').value = summary
-        todo.add('created').value = attrs.get('created', date)
-        todo.add('dtstamp').value = attrs.get('dtstamp', date)
-        todo.add('last-modified').value = attrs.get('last-modified', date)
+        todo.add('created').value = attrs.get('created', default_date)
+        todo.add('dtstamp').value = attrs.get('dtstamp', default_date)
+        todo.add('last-modified').value = attrs.get('last-modified', default_date)
         # organizer = todo.add('organizer')
         # organizer.value = "mailto:%s" % ACCOUNT_EMAIL_ADDRESS
         # organizer.params["CN"] = [ACCOUNT_FULL_NAME]
@@ -103,7 +107,7 @@ class Task(caldav.Event):
         if not hasattr(vtodo, attr_name):
             vtodo.add(attr_name).value = value
         else:
-            vtodo.attr_name.value = value
+            getattr(vtodo, attr_name).value = value
 
     @property
     def status(self):
@@ -123,7 +127,7 @@ class Task(caldav.Event):
     def priority(self, value):
         if not isinstance(value, int):
             value = int(value or "0")
-        self.todo_setattr("priority", value)
+        self.todo_setattr("priority", str(value))
 
     @property
     def summary(self):

@@ -6,7 +6,6 @@ from taskdav.task import Task, TaskDAVClient
 from datetime import datetime
 import caldav
 import re
-import uuid
 import aaargh
 import config
 
@@ -128,6 +127,7 @@ def add(calendar_name, text):
         task.save()
     except Exception, e:
         print "Error saving event: %r" % e
+        return
     task_lookup = client.get_tasks(calendar_name)
     task_lookup[task.id] = task
     print task_lookup.shortest(task.id), task.format()
