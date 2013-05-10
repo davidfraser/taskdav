@@ -123,6 +123,29 @@ class Task(caldav.Event):
 
 class TaskList(caldav.Calendar):
     event_cls = Task
+    def __init__(self, client, url=None, parent=None, name=None, id=None):
+        caldav.Calendar.__init__(self, client, url, parent, name, id)
+        self.tasks = None
+
+    def load_tasks(self):
+        self.tasks = tasks = short_id.prefix_dict()
+        for task in self.events():
+            task_id = task.id or (get_object_urlname(task).replace(".ics", ""))
+            tasks[task_id] = task
+
+    def get_tasks(self):
+        if self.tasks is None:
+            self.load_tasks()
+        return self.tasks
+
+    def get_task(self, task_id):
+        tasks = self.get_tasks()
+        task = tasks.unique(task_id)
+        if not task.instance:
+            task.load()
+        if not task.id:
+            task.id = task.instance.vtodo.uid.value
+        return task
 
 class TaskPrincipal(caldav.Principal):
     calendar_cls = TaskList
@@ -150,23 +173,11 @@ class TaskDAVClient(caldav.DAVClient):
         return self.calendar_lookup[calendar_name]
 
     def load_tasks(self, calendar_name):
-        # TODO: move this into TaskList
-        self.calendar_tasks[calendar_name] = tasks = short_id.prefix_dict()
-        for task in self.get_calendar(calendar_name).events():
-            task_id = task.id or (get_object_urlname(task).replace(".ics", ""))
-            tasks[task_id] = task
+        self.get_calendar(calendar_name).load_tasks()
 
     def get_tasks(self, calendar_name):
-        if not calendar_name in self.calendar_tasks:
-            self.load_tasks(calendar_name)
-        return self.calendar_tasks[calendar_name]
+        return self.get_calendar(calendar_name).get_tasks()
 
     def get_task(self, calendar_name, task_id):
-        tasks = self.get_tasks(calendar_name)
-        task = tasks.unique(task_id)
-        if not task.instance:
-            task.load()
-        if not task.id:
-            task.id = task.instance.vtodo.uid.value
-        return task
+        return self.get_calendar(calendar_name).get_task(task_id)
 
