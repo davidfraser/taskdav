@@ -136,7 +136,7 @@ class TaskDAVClient(caldav.DAVClient):
         self.calendar_lookup = {}
         self.calendar_tasks = {}
 
-    def cache_calendars(self):
+    def load_calendars(self):
         self.calendar_lookup = {}
         calendars = self.principal.calendars()
         for calendar in calendars:
@@ -146,10 +146,10 @@ class TaskDAVClient(caldav.DAVClient):
 
     def get_calendar(self, calendar_name):
         if not calendar_name in self.calendar_lookup:
-            self.cache_calendars()
+            self.load_calendars()
         return self.calendar_lookup[calendar_name]
 
-    def cache_tasks(self, calendar_name):
+    def load_tasks(self, calendar_name):
         # TODO: move this into TaskList
         self.calendar_tasks[calendar_name] = tasks = short_id.prefix_dict()
         for task in self.get_calendar(calendar_name).events():
@@ -158,7 +158,7 @@ class TaskDAVClient(caldav.DAVClient):
 
     def get_tasks(self, calendar_name):
         if not calendar_name in self.calendar_tasks:
-            self.cache_tasks(calendar_name)
+            self.load_tasks(calendar_name)
         return self.calendar_tasks[calendar_name]
 
     def get_task(self, calendar_name, task_id):
