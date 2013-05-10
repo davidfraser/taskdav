@@ -7,7 +7,7 @@ import urllib2
 import short_id
 from lxml import etree
 from caldav.elements import base, cdav, dav
-from caldav.lib import error, url
+from caldav.lib import error, vcal, url
 from caldav.lib.namespace import ns
 
 class GetEtag(base.BaseElement):
@@ -30,6 +30,16 @@ class Task(caldav.Event):
     def __init__(self, client, url=None, data=None, parent=None, id=None, etag=None):
         caldav.Event.__init__(self, client, url, data, parent, id)
         self.etag = etag
+
+    def load(self):
+        """
+        Load the task from the caldav server.
+        """
+        r = self.client.request(self.url.path)
+        # TODO: contribute etag fetching back to caldav
+        self.etag = dict(r.headers).get('etag', None)
+        self.data = vcal.fix(r.raw)
+        return self
 
     @classmethod
     def new_task(cls, client, parent, summary, **attrs):
@@ -128,10 +138,10 @@ class Task(caldav.Event):
         """Formats a task for output"""
         if not self.instance:
             self.load()
-        priority = self.PRIORITY_I2C[int(self.todo_getattr("priority") or "0")]
-        status = self.todo_getattr("status")
+        priority = self.PRIORITY_I2C[self.priority]
+        status = self.status
         status_str = ("x " if status == "COMPLETED" else "") + (priority + " " if priority else "")
-        return "%s%s %s" % (status_str, self.todo_getattr("summary"), self.todo_getattr("status"))
+        return "%s%s %s" % (status_str, self.summary, status)
 
 class TaskList(caldav.Calendar):
     event_cls = Task
