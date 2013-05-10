@@ -2,8 +2,12 @@
 
 import caldav
 import re
+import urlparse
 import urllib2
 import short_id
+from lxml import etree
+from caldav.elements import cdav, dav
+from caldav.lib import error, url
 
 def get_object_urlname(davobject):
     """Returns the last component of the url path as the object's name"""
@@ -125,20 +129,58 @@ class TaskList(caldav.Calendar):
     event_cls = Task
     def __init__(self, client, url=None, parent=None, name=None, id=None):
         caldav.Calendar.__init__(self, client, url, parent, name, id)
-        self.tasks = None
+        self._tasks = None
+
+    def tasks(self):
+        """
+        Search tasks in the calendar
+
+        Returns:
+         * [Task(), ...]
+        """
+        matches = []
+
+        # build the request
+        data = cdav.CalendarData()
+        prop = dav.Prop() + data
+
+        vevent = cdav.CompFilter("VTODO")
+        vcal = cdav.CompFilter("VCALENDAR") + vevent
+        filter = cdav.Filter() + vcal
+
+        root = cdav.CalendarQuery() + [prop, filter]
+
+        q = etree.tostring(root.xmlelement(), encoding="utf-8",
+                           xml_declaration=True)
+        response = self.client.report(self.url.path, q, 1)
+        for r in response.tree.findall(".//" + dav.Response.tag):
+            status = r.find(".//" + dav.Status.tag)
+            if status.text.endswith("200 OK"):
+                href = urlparse.urlparse(r.find(dav.Href.tag).text)
+                href = url.canonicalize(href, self)
+                data = r.find(".//" + cdav.CalendarData.tag).text
+                e = self.event_cls(self.client, url=href, data=data, parent=self)
+                matches.append(e)
+            else:
+                raise error.ReportError(response.raw)
+
+        return matches
 
     def load_tasks(self):
-        self.tasks = tasks = short_id.prefix_dict()
-        for task in self.events():
+        """loads all tasks in this TaskList into a lookup by id"""
+        self._tasks = tasks = short_id.prefix_dict()
+        for task in self.tasks():
             task_id = task.id or (get_object_urlname(task).replace(".ics", ""))
             tasks[task_id] = task
 
     def get_tasks(self):
-        if self.tasks is None:
+        """returns a lookup making id to task for all tasks in this TaskList"""
+        if self._tasks is None:
             self.load_tasks()
-        return self.tasks
+        return self._tasks
 
     def get_task(self, task_id):
+        """returns a task by id, ensuring it is loaded"""
         tasks = self.get_tasks()
         task = tasks.unique(task_id)
         if not task.instance:
