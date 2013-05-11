@@ -212,7 +212,6 @@ class TaskDAVClient(caldav.DAVClient):
         # cache a principal we can use
         self.principal = TaskPrincipal(self, url)
         self.calendar_lookup = {}
-        self.calendar_tasks = {}
 
     def load_calendars(self):
         self.calendar_lookup = {}
