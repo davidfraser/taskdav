@@ -14,9 +14,6 @@ from caldav.lib.namespace import ns
 
 utc = caldav.vobject.icalendar.utc
 
-class GetEtag(base.BaseElement):
-    tag = ns("D", "getetag")
-
 def get_object_urlname(davobject):
     """Returns the last component of the url path as the object's name"""
     name = davobject.url.path.rstrip("/")
@@ -31,17 +28,11 @@ class Task(caldav.Event):
     PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
     ALL_PRIORITIES = {pi for pc, pi in PRIORITIES if pc}
 
-    def __init__(self, client, url=None, data=None, parent=None, id=None, etag=None):
-        caldav.Event.__init__(self, client, url, data, parent, id)
-        self.etag = etag
-
     def load(self):
         """
         Load the task from the caldav server.
         """
         r = self.client.request(self.url.path)
-        # TODO: contribute etag fetching back to caldav
-        self.etag = dict(r.headers).get('etag', None)
         self.data = vcal.fix(r.raw)
         return self
 
@@ -149,9 +140,7 @@ class Task(caldav.Event):
 
 class TaskList(caldav.Calendar):
     event_cls = Task
-    def __init__(self, client, url=None, parent=None, name=None, id=None):
-        caldav.Calendar.__init__(self, client, url, parent, name, id)
-        self._tasks = None
+    _tasks = None
 
     def tasks(self):
         """
@@ -163,7 +152,7 @@ class TaskList(caldav.Calendar):
         matches = []
 
         # build the request
-        getetag = GetEtag()
+        getetag = dav.GetEtag()
         data = cdav.CalendarData()
         prop = dav.Prop() + [getetag, data]
 
@@ -182,7 +171,7 @@ class TaskList(caldav.Calendar):
                 href = urlparse.urlparse(r.find(dav.Href.tag).text)
                 href = url.canonicalize(href, self)
                 data = r.find(".//" + cdav.CalendarData.tag).text
-                etag = r.find(".//" + GetEtag.tag).text
+                etag = r.find(".//" + dav.GetEtag.tag).text
                 e = self.event_cls(self.client, url=href, data=data, parent=self, etag=etag)
                 matches.append(e)
             else:
