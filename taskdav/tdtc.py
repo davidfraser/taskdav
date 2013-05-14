@@ -3,11 +3,12 @@
 """todo.txt command-line compatibility - implements many commands from todo.txt"""
 
 from taskdav.task import Task, TaskDAVClient
+from taskdav import config
 from datetime import datetime
 import caldav
 import re
 import aaargh
-import config
+import colorama
 
 cfg = config.get_config()
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
@@ -18,6 +19,24 @@ utc = caldav.vobject.icalendar.utc
 app = aaargh.App(description="A simple command-line tool for interacting with Tasks over CalDAV")
 
 app.arg('-n', '--calendar-name', help="Name of the calendar to use", default="Tasks")
+app.arg('-c', '--color', dest='color', action="store_true", help="Color output mode", default=True)
+app.arg('-p', '--no-color', dest='color', action="store_false", help="Plain output mode (disable color)")
+
+def setup_color(enabled):
+    """Enables or disables color output"""
+    if enabled:
+        colorama.init()
+    else:
+        colorama.init(strip=True, convert=False)
+
+PRIORITY_COLOR_MAP = {
+        1: colorama.Fore.CYAN,
+        2: colorama.Fore.GREEN,
+        3: colorama.Fore.YELLOW,
+    }
+    
+def output_task(task_lookup, task):
+    print PRIORITY_COLOR_MAP.get(task.priority, "") + task_lookup.shortest(task.id), task.format() + colorama.Style.RESET_ALL
 
 def alias(name, alias_name):
     """Adds an alias to the given command name"""
@@ -27,7 +46,8 @@ def alias(name, alias_name):
 
 @app.cmd(name="list", help="Displays all incomplete tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
-def list_(calendar_name, term):
+def list_(calendar_name, term, color):
+    setup_color(color)
     calendar = client.get_calendar(calendar_name)
     task_lookup = calendar.get_tasks()
     # TODO: make lookup by known ID not have to load all tasks
@@ -37,13 +57,14 @@ def list_(calendar_name, term):
         if task.status != "COMPLETED":
             search_text = task.summary.lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
-                print task_lookup.shortest(task_id), task.format()
+                output_task(task_lookup, task)
 
 alias("list", "ls")
 
 @app.cmd(help="Displays all tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
-def listall(calendar_name, term):
+def listall(calendar_name, term, color):
+    setup_color(color)
     calendar = client.get_calendar(calendar_name)
     task_lookup = calendar.get_tasks()
     # TODO: make lookup by known ID not have to load all tasks
@@ -52,12 +73,13 @@ def listall(calendar_name, term):
         task = calendar.get_task(task_id)
         search_text = task.summary.lower()
         if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
-            print task_lookup.shortest(task_id), task.format()
+            output_task(task_lookup, task)
 
 alias("listall", "lsa")
 
 @app.cmd(help="Reports on the number of open and done tasks")
-def report(calendar_name):
+def report(calendar_name, color):
+    setup_color(color)
     date = datetime.utcnow().replace(tzinfo=utc)
     calendar = client.get_calendar(calendar_name)
     task_lookup = calendar.get_tasks()
@@ -73,7 +95,8 @@ def report(calendar_name):
 @app.cmd(help="Displays all incomplete tasks of the given (or any) priority containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('priority', type=str, nargs='?', help="Priority")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
-def listpri(calendar_name, priority, term):
+def listpri(calendar_name, priority, term, color):
+    setup_color(color)
     try:
         priorities = Task.parse_priority_range(priority)
     except ValueError:
@@ -88,14 +111,15 @@ def listpri(calendar_name, priority, term):
         if task.status != "COMPLETED" and task.priority in priorities:
             search_text = task.summary.lower()
             if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
-                print task_lookup.shortest(task_id), task.format()
+                output_task(task_lookup, task)
 
 alias("listpri", "lsp")
 
 CONTEXT_RE = re.compile(r'(?:^|\s)(@\w*\b)')
 
 @app.cmd(help="Lists all the task contexts that start with the @ sign in task summaries")
-def listcon(calendar_name):
+def listcon(calendar_name, color):
+    setup_color(color)
     calendar = client.get_calendar(calendar_name)
     task_lookup = calendar.get_tasks()
     contexts = set()
@@ -111,7 +135,8 @@ alias("listcon", "lsc")
 PROJ_RE = re.compile(r'(?:^|\s)(\+\w*\b)')
 
 @app.cmd(help="Lists all the task projects that start with the + sign in task summaries")
-def listproj(calendar_name):
+def listproj(calendar_name, color):
+    setup_color(color)
     calendar = client.get_calendar(calendar_name)
     task_lookup = calendar.get_tasks()
     projects = set()
@@ -126,7 +151,8 @@ alias("listproj", "lsprj")
 
 @app.cmd
 @app.cmd_arg('text', type=str, nargs='+', help="The description of the task")
-def add(calendar_name, text):
+def add(calendar_name, text, color):
+    setup_color(color)
     text = " ".join(text)
     calendar = client.get_calendar(calendar_name)
     try:
@@ -137,13 +163,14 @@ def add(calendar_name, text):
         return
     task_lookup = calendar.get_tasks()
     task_lookup[task.id] = task
-    print task_lookup.shortest(task.id), task.format()
+    output_task(task_lookup, task)
 
 alias("add", "a")
 
 @app.cmd
 @app.cmd_arg('tasks', type=str, nargs='+', help="The description of the tasks (one per line)")
-def addm(calendar_name, tasks):
+def addm(calendar_name, tasks, color):
+    setup_color(color)
     tasks = [task.strip() for task in " ".join(tasks).split("\n") if task.strip()]
     for task in tasks:
         add(calendar_name, [task])
@@ -151,50 +178,54 @@ def addm(calendar_name, tasks):
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
 @app.cmd_arg('text', type=str, nargs='+', help="New summary text for the task")
-def replace(calendar_name, task_id, text):
+def replace(calendar_name, task_id, text, color):
+    setup_color(color)
     text = " ".join(text)
     calendar = client.get_calendar(calendar_name)
     task = calendar.get_task(task_id)
     task.summary = text
     task.save()
     task_lookup = calendar.get_tasks()
-    print task_lookup.shortest(task_id), task.format()
+    output_task(task_lookup, task)
 
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
 @app.cmd_arg('text', type=str, nargs='+', help="Extra text to append to the task")
-def append(calendar_name, task_id, text):
+def append(calendar_name, task_id, text, color):
+    setup_color(color)
     text = " ".join(text)
     calendar = client.get_calendar(calendar_name)
     task = calendar.get_task(task_id)
     task.summary = task.summary.rstrip(" ") + " " + text
     task.save()
     task_lookup = calendar.get_tasks()
-    print task_lookup.shortest(task_id), task.format()
+    output_task(task_lookup, task)
 
 alias("append", "app")
 
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
 @app.cmd_arg('text', type=str, nargs='+', help="Extra text to prepend to the task")
-def prepend(calendar_name, task_id, text):
+def prepend(calendar_name, task_id, text, color):
+    setup_color(color)
     text = " ".join(text)
     calendar = client.get_calendar(calendar_name)
     task = calendar.get_task(task_id)
     task.summary = text + " " + task.summary.lstrip(" ")
     task.save()
     task_lookup = calendar.get_tasks()
-    print task_lookup.shortest(task_id), task.format()
+    output_task(task_lookup, task)
 
 alias("prepend", "prep")
 
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to delete")
-def rm(calendar_name, task_id):
+def rm(calendar_name, task_id, color):
+    setup_color(color)
     calendar = client.get_calendar(calendar_name)
     task = calendar.get_task(task_id)
     task_lookup = calendar.get_tasks()
-    print task_lookup.shortest(task_id), task.format()
+    output_task(task_lookup, task)
     answer = ""
     while answer not in {"y", "n"}:
         answer = raw_input("delete (y/n)").lower()
@@ -206,32 +237,35 @@ alias("rm", "del")
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to prioritize")
 @app.cmd_arg('priority', type=str, help="Priority")
-def pri(calendar_name, task_id, priority):
+def pri(calendar_name, task_id, priority, color):
+    setup_color(color)
     calendar = client.get_calendar(calendar_name)
     task = calendar.get_task(task_id)
     task.priority = task.parse_priority(priority)
     task.save()
     task_lookup = calendar.get_tasks()
-    print task_lookup.shortest(task_id), task.format()
+    output_task(task_lookup, task)
 
 alias("pri", "p")
 
 @app.cmd
 @app.cmd_arg('task_ids', type=str, nargs='+', help="ID of the task(s) to deprioritize")
-def depri(calendar_name, task_ids):
+def depri(calendar_name, task_ids, color):
+    setup_color(color)
     calendar = client.get_calendar(calendar_name)
     task_lookup = calendar.get_tasks()
     for task_id in task_ids:
         task = calendar.get_task(task_id)
         task.priority = 0
         task.save()
-        print task_lookup.shortest(task_id), task.format()
+        output_task(task_lookup, task)
 
 alias("depri", "dp")
 
 @app.cmd
 @app.cmd_arg('task_ids', type=str, nargs='+', help="ID of the task(s) to mark as done")
-def do(calendar_name, task_ids):
+def do(calendar_name, task_ids, color):
+    setup_color(color)
     calendar = client.get_calendar(calendar_name)
     task_lookup = calendar.get_tasks()
     for task_id in task_ids:
@@ -239,7 +273,7 @@ def do(calendar_name, task_ids):
         task.status = "COMPLETED"
         task.todo_setattr("percent_complete", "100")
         task.save()
-        print task_lookup.shortest(task_id), task.format()
+        output_task(task_lookup, task)
 
 if __name__ == "__main__":
     app.run()
