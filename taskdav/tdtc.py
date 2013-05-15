@@ -219,18 +219,23 @@ def prepend(calendar_name, task_id, text, color):
 alias("prepend", "prep")
 
 @app.cmd
-@app.cmd_arg('task_id', type=str, help="ID of the task to delete")
-def rm(calendar_name, task_id, color):
+@app.cmd_arg('task_id', type=str, nargs='+', help="ID of the task to delete")
+@app.cmd_arg('-y', action='store_false', dest='prompt', default=True, help="Don't prompt before deletion")
+def rm(calendar_name, task_id, prompt, color):
     setup_color(color)
     calendar = client.get_calendar(calendar_name)
-    task = calendar.get_task(task_id)
     task_lookup = calendar.get_tasks()
-    output_task(task_lookup, task)
-    answer = ""
-    while answer not in {"y", "n"}:
-        answer = raw_input("delete (y/n)").lower()
-    if answer == "y":
-        task.delete()
+    for tid in task_id:
+        task = calendar.get_task(tid)
+        output_task(task_lookup, task)
+        answer = "y"
+        if prompt:
+            answer = ""
+            while answer not in {"y", "n"}:
+                answer = raw_input("delete (y/n)").lower()
+        if answer == "y":
+            task.delete()
+            print colorama.Fore.RED + "deleted" + colorama.Style.RESET_ALL
 
 alias("rm", "del")
 
