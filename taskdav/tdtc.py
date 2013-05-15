@@ -149,14 +149,23 @@ def listproj(calendar_name, color):
 
 alias("listproj", "lsprj")
 
+PRIORITY_PREFIX_RE = re.compile('^[(]([A-Ha-h])[)]\s+')
+
 @app.cmd
 @app.cmd_arg('text', type=str, nargs='+', help="The description of the task")
 def add(calendar_name, text, color):
     setup_color(color)
     text = " ".join(text)
+    prefix_match = PRIORITY_PREFIX_RE.match(text)
+    if prefix_match:
+        priority, text = Task.parse_priority(prefix_match.group(1)), text[prefix_match.end():]
+    else:
+        priority = None
     calendar = client.get_calendar(calendar_name)
     try:
         task = Task.new_task(client, parent=calendar, summary=text)
+        if priority is not None:
+            task.priority = priority
         task.save()
     except Exception, e:
         print "Error saving event: %r" % e
