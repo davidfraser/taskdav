@@ -33,6 +33,7 @@ PRIORITY_COLOR_MAP = {
         1: colorama.Fore.CYAN,
         2: colorama.Fore.GREEN,
         3: colorama.Fore.YELLOW,
+        8: colorama.Style.BRIGHT, # Waiting
     }
     
 def output_task(task_lookup, task):
@@ -149,7 +150,7 @@ def listproj(calendar_name, color):
 
 alias("listproj", "lsprj")
 
-PRIORITY_PREFIX_RE = re.compile('^[(]([A-Ha-h])[)]\s+')
+PRIORITY_PREFIX_RE = re.compile('^[(]([A-FHWa-fhw])[)]\s+')
 
 @app.cmd
 @app.cmd_arg('text', type=str, nargs='+', help="The description of the task")
@@ -182,7 +183,7 @@ def addm(calendar_name, tasks, color):
     setup_color(color)
     tasks = [task.strip() for task in " ".join(tasks).split("\n") if task.strip()]
     for task in tasks:
-        add(calendar_name, [task])
+        add(calendar_name, [task], color)
 
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")

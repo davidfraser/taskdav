@@ -21,11 +21,12 @@ def get_object_urlname(davobject):
     return urllib2.unquote(name)
 
 class Task(caldav.Event):
-    # priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low)
-    PRIORITIES = [("A", 1), ("B", 2), ("C", 3), ("D", 4), ("", 5), ("", 0), ("E", 6), ("F", 7), ("G", 8), ("H", 9)]
+    # priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low) except G has been temporarily replaced with W for delegated tasks
+    # TODO: find another way to do task delegation
+    PRIORITIES = [("A", 1), ("B", 2), ("C", 3), ("D", 4), ("", 5), ("", 0), ("E", 6), ("F", 7), ("W", 8), ("H", 9)]
     PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
     PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
-    PRIORITY_RE = re.compile(r'([A-Ha-h]|[A-Ha-h]-[A-Ha-h])')
+    PRIORITY_RE = re.compile(r'([A-FHWa-fhw]|[A-FHWa-fhw]-[A-FHWa-fhw])')
     ALL_PRIORITIES = {pi for pc, pi in PRIORITIES if pc}
 
     def load(self):
