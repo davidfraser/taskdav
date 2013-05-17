@@ -135,9 +135,8 @@ class Task(caldav.Event):
         if not self.instance:
             self.load()
         priority = self.PRIORITY_I2C[self.priority]
-        status = self.status
-        status_str = ("x " if status == "COMPLETED" else "") + (priority + " " if priority else "")
-        return "%s%s %s" % (status_str, self.summary, status)
+        status_str = ("x " if self.status == "COMPLETED" else "") + (priority + " " if priority else "")
+        return "%s%s" % (status_str, self.summary)
 
 class TaskList(caldav.Calendar):
     event_cls = Task
