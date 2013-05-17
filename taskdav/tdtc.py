@@ -45,6 +45,12 @@ def alias(name, alias_name):
     parser_map = app._parser._subparsers._group_actions[0]._name_parser_map
     parser_map[alias_name] = parser_map[name]
 
+STATUS_KEY = {"NEEDS-ACTION": 0, "IN-PROCESS": 1, "COMPLETED": 2, "CANCELLED": 3}
+
+def sorted_tasks(task_lookup):
+    """returns the given tasks sorted by priority, then status, then summary"""
+    return sorted(task_lookup, key=lambda t: (task_lookup[t].priority or 5, STATUS_KEY.get(task_lookup[t].status.upper(), task_lookup[t].status), task_lookup[t].summary))
+
 @app.cmd(name="list", help="Displays all incomplete tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
 def list_(calendar_name, term, color):
@@ -53,7 +59,7 @@ def list_(calendar_name, term, color):
     task_lookup = calendar.get_tasks()
     # TODO: make lookup by known ID not have to load all tasks
     term = [t.lower() for t in term]
-    for task_id in sorted(task_lookup):
+    for task_id in sorted_tasks(task_lookup):
         task = calendar.get_task(task_id)
         if task.status != "COMPLETED":
             search_text = task.summary.lower()
@@ -70,7 +76,7 @@ def listall(calendar_name, term, color):
     task_lookup = calendar.get_tasks()
     # TODO: make lookup by known ID not have to load all tasks
     term = [t.lower() for t in term]
-    for task_id in sorted(task_lookup):
+    for task_id in sorted_tasks(task_lookup):
         task = calendar.get_task(task_id)
         search_text = task.summary.lower()
         if all(task.id.startswith(t) or (t[:-1] not in search_text if t.endswith('-') else t in search_text) for t in term):
@@ -85,7 +91,7 @@ def report(calendar_name, color):
     calendar = client.get_calendar(calendar_name)
     task_lookup = calendar.get_tasks()
     task_status_count = {}
-    for task_id in sorted(task_lookup):
+    for task_id in task_lookup:
         task = calendar.get_task(task_id)
         status = task.status
         task_status_count[status] = task_status_count.get(status, 0) + 1
@@ -107,7 +113,7 @@ def listpri(calendar_name, priority, term, color):
     calendar = client.get_calendar(calendar_name)
     task_lookup = calendar.get_tasks()
     term = [t.lower() for t in term]
-    for task_id in sorted(task_lookup):
+    for task_id in sorted_tasks(task_lookup):
         task = calendar.get_task(task_id)
         if task.status != "COMPLETED" and task.priority in priorities:
             search_text = task.summary.lower()
