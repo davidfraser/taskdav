@@ -106,7 +106,7 @@ def listpri(calendar_name, priority, term, color):
     setup_color(color)
     try:
         priorities = Task.parse_priority_range(priority)
-    except ValueError:
+    except KeyError:
         # Assume this wasn't really a priority
         term.insert(0, priority)
         priorities = Task.ALL_PRIORITIES

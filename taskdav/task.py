@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import caldav
+import functools
 import re
 import uuid
 import urlparse
@@ -11,6 +12,7 @@ from lxml import etree
 from caldav.elements import base, cdav, dav
 from caldav.lib import error, vcal, url
 from caldav.lib.namespace import ns
+from flufl import enum
 
 utc = caldav.vobject.icalendar.utc
 
@@ -20,10 +22,54 @@ def get_object_urlname(davobject):
     name = name if "/" not in name else name[name.rfind("/")+1:]
     return urllib2.unquote(name)
 
+class PriorityValue(enum._enum.EnumValue):
+    """Implements priority comparisons"""
+
+    def __eq__(self, other):
+        return type(self) == type(other) and self.value == other.value
+
+    def __ne__(self, other):
+        return type(self) != type(other) or self.value != other.value
+
+    def __lt__(self, other):
+        if type(self) != type(other):
+            return type(self) < type(other)
+        return self.value < other.value
+
+    def __le__(self, other):
+        if type(self) != type(other):
+            return type(self) < type(other)
+        return self.value <= other.value
+
+    def __gt__(self, other):
+        if type(self) != type(other):
+            return type(self) > type(other)
+        return self.value > other.value
+
+    def __ge__(self, other):
+        if type(self) != type(other):
+            return type(self) > type(other)
+        return self.value >= other.value
+
+class Priority(enum.Enum):
+    unspecified = 0
+    A = 1
+    B = 2
+    C = 3
+    D = 4
+    default = 5
+    E = 6
+    F = 7
+    W = 8
+    H = 9
+
+    __value_factory__ = PriorityValue
+
+
 class Task(caldav.Event):
     # priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low) except G has been temporarily replaced with W for delegated tasks
     # TODO: find another way to do task delegation
-    PRIORITIES = [("A", 1), ("B", 2), ("C", 3), ("D", 4), ("", 5), ("", 0), ("E", 6), ("F", 7), ("W", 8), ("H", 9)]
+    PRIORITIES = [("" if len(P.name) > 1 else P.name, P.value) for P in list(Priority)]
     PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
     PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
     PRIORITY_RE = re.compile(r'([A-FHWa-fhw]|[A-FHWa-fhw]-[A-FHWa-fhw])')
