@@ -2,7 +2,7 @@
 
 """todo.txt command-line compatibility - implements many commands from todo.txt"""
 
-from taskdav.task import Task, TaskDAVClient
+from taskdav.task import Priority, Task, TaskDAVClient
 from taskdav import config
 from datetime import datetime
 import caldav
@@ -30,10 +30,10 @@ def setup_color(enabled):
         colorama.init(strip=True, convert=False)
 
 PRIORITY_COLOR_MAP = {
-        1: colorama.Fore.CYAN,
-        2: colorama.Fore.GREEN,
-        3: colorama.Fore.YELLOW,
-        8: colorama.Style.BRIGHT, # Waiting
+        Priority.A: colorama.Fore.CYAN,
+        Priority.B: colorama.Fore.GREEN,
+        Priority.C: colorama.Fore.YELLOW,
+        Priority.W: colorama.Style.BRIGHT, # Waiting
     }
     
 def output_task(task_lookup, task):
@@ -49,7 +49,7 @@ STATUS_KEY = {"NEEDS-ACTION": 0, "IN-PROCESS": 1, "COMPLETED": 2, "CANCELLED": 3
 
 def sorted_tasks(task_lookup):
     """returns the given tasks sorted by priority, then status, then summary"""
-    return sorted(task_lookup, key=lambda t: (task_lookup[t].priority or 5, STATUS_KEY.get(task_lookup[t].status.upper(), task_lookup[t].status), task_lookup[t].summary))
+    return sorted(task_lookup, key=lambda t: (task_lookup[t].priority, STATUS_KEY.get(task_lookup[t].status.upper(), task_lookup[t].status), task_lookup[t].summary))
 
 @app.cmd(name="list", help="Displays all incomplete tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
@@ -277,7 +277,7 @@ def depri(calendar_name, task_ids, color):
     task_lookup = calendar.get_tasks()
     for task_id in task_ids:
         task = calendar.get_task(task_id)
-        task.priority = 0
+        task.priority = Priority.unspecified
         task.save()
         output_task(task_lookup, task)
 

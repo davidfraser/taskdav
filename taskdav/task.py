@@ -34,22 +34,34 @@ class PriorityValue(enum._enum.EnumValue):
     def __lt__(self, other):
         if type(self) != type(other):
             return type(self) < type(other)
-        return self.value < other.value
+        return self.sort_key < other.sort_key
 
     def __le__(self, other):
         if type(self) != type(other):
             return type(self) < type(other)
-        return self.value <= other.value
+        return self.sort_key <= other.sort_key
 
     def __gt__(self, other):
         if type(self) != type(other):
             return type(self) > type(other)
-        return self.value > other.value
+        return self.sort_key > other.sort_key
 
     def __ge__(self, other):
         if type(self) != type(other):
             return type(self) > type(other)
-        return self.value >= other.value
+        return self.sort_key >= other.sort_key
+
+    @property
+    def sort_key(self):
+        return self.value if self.value != 0 else 5
+
+    @property
+    def str_value(self):
+        return str(self.value)
+
+    @property
+    def display_name(self):
+        return self.name if len(self.name) == 1 else ""
 
 class Priority(enum.Enum):
     unspecified = 0
@@ -70,10 +82,10 @@ class Task(caldav.Event):
     # priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low) except G has been temporarily replaced with W for delegated tasks
     # TODO: find another way to do task delegation
     PRIORITIES = [("" if len(P.name) > 1 else P.name, P.value) for P in list(Priority)]
-    PRIORITY_C2I = {pc: pi for pc, pi in PRIORITIES if pc}
+    PRIORITY_C2I = {p.name: p for p in Priority if len(p.name) == 1}
     PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
     PRIORITY_RE = re.compile(r'([A-FHWa-fhw]|[A-FHWa-fhw]-[A-FHWa-fhw])')
-    ALL_PRIORITIES = {pi for pc, pi in PRIORITIES if pc}
+    ALL_PRIORITIES = set(Priority)
 
     def load(self):
         """
@@ -98,8 +110,7 @@ class Task(caldav.Event):
         # organizer.value = "mailto:%s" % ACCOUNT_EMAIL_ADDRESS
         # organizer.params["CN"] = [ACCOUNT_FULL_NAME]
         # todo.add('percent-complete').value = "0"
-        # priority 0 is undefined priority
-        todo.add('priority').value = "0"
+        todo.add('priority').value = Priority.unspecified.str_value
         # todo.add('sequence').value = "0"
         todo.add('status').value = 'NEEDS-ACTION'
         todo.add('uid').value = uid = attrs.get('uid', str(uuid.uuid4()))
@@ -107,25 +118,25 @@ class Task(caldav.Event):
 
     @classmethod
     def parse_priority_range(cls, priority_str):
-        """Parses the given priority_str which can be either a single priority `C` or a range `B-E`, and return a set of caldav priority values"""
+        """Parses the given priority_str which can be either a single priority `C` or a range `B-E`, and return a set of PriorityValues"""
         if priority_str:
             if not cls.PRIORITY_RE.match(priority_str):
                 raise ValueError("Priority range expression is not valid: %s" % priority_str)
             priority_str = priority_str.upper()
             if "-" in priority_str:
-                start_i, stop_i = cls.PRIORITY_C2I[priority_str[0]], cls.PRIORITY_C2I[priority_str[2]]
-                return {pi for pc, pi in cls.PRIORITIES if start_i <= pi <= stop_i and pc}
+                start_p, stop_p = Priority(priority_str[0]), Priority(priority_str[2])
+                return {p for p in Priority if start_p <= p <= stop_p}
             else:
-                return {cls.PRIORITY_C2I[priority_str]}
+                return {Priority(priority_str)}
         else:
             return cls.ALL_PRIORITIES
 
     @classmethod
     def parse_priority(cls, priority_str):
-        """Parses the given priority_str which must be a single priority `C`, and return a caldav priority value"""
+        """Parses the given priority_str which must be a single priority `C`, and return a PriorityValue"""
         if priority_str:
             priority_str = priority_str.upper()
-            return cls.PRIORITY_C2I[priority_str]
+            return Priority(priority_str)
         else:
             return None
 
@@ -158,14 +169,20 @@ class Task(caldav.Event):
 
     @property
     def priority(self):
-        """Returns the current priority as an integer"""
-        return int(self.todo_getattr("priority", "0"))
+        """Returns the current priority as a PriorityValue"""
+        return Priority(int(self.todo_getattr("priority", "0")))
 
     @priority.setter
     def priority(self, value):
-        if not isinstance(value, int):
-            value = int(value or "0")
-        self.todo_setattr("priority", str(value))
+        """Allows setting the priority to an integer or string"""
+        if isinstance(value, basestring):
+            if value.isdigit():
+                value = Priority(int(value or "0"))
+            else:
+                value = Priority(value.upper())
+        elif isinstance(value, int):
+            value = Priority(value)
+        self.todo_setattr("priority", value.str_value)
 
     @property
     def summary(self):
@@ -180,7 +197,7 @@ class Task(caldav.Event):
         """Formats a task for output"""
         if not self.instance:
             self.load()
-        priority = self.PRIORITY_I2C[self.priority]
+        priority = self.priority.display_name
         status_str = ("x " if self.status == "COMPLETED" else "") + (priority + " " if priority else "")
         return "%s%s" % (status_str, self.summary)
 
