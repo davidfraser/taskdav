@@ -77,15 +77,13 @@ class Priority(enum.Enum):
 
     __value_factory__ = PriorityValue
 
+Priority.__all__ = set(Priority)
+Priority.__named__ = {p for p in Priority if len(p.name) == 1}
+Priority.__range_re__ = re.compile(r'([A-FHWa-fhw]|[A-FHWa-fhw]-[A-FHWa-fhw])')
 
 class Task(caldav.Event):
     # priority map: A-D = 1-4 (high), none=0=5 (medium), E-H=6-9 (low) except G has been temporarily replaced with W for delegated tasks
     # TODO: find another way to do task delegation
-    PRIORITIES = [("" if len(P.name) > 1 else P.name, P.value) for P in list(Priority)]
-    PRIORITY_C2I = {p.name: p for p in Priority if len(p.name) == 1}
-    PRIORITY_I2C = {pi: "(%s)" % pc if pc else "" for pc, pi in PRIORITIES}
-    PRIORITY_RE = re.compile(r'([A-FHWa-fhw]|[A-FHWa-fhw]-[A-FHWa-fhw])')
-    ALL_PRIORITIES = set(Priority)
 
     def load(self):
         """
@@ -120,7 +118,7 @@ class Task(caldav.Event):
     def parse_priority_range(cls, priority_str):
         """Parses the given priority_str which can be either a single priority `C` or a range `B-E`, and return a set of PriorityValues"""
         if priority_str:
-            if not cls.PRIORITY_RE.match(priority_str):
+            if not Priority.__range_re__.match(priority_str):
                 raise ValueError("Priority range expression is not valid: %s" % priority_str)
             priority_str = priority_str.upper()
             if "-" in priority_str:
@@ -129,7 +127,7 @@ class Task(caldav.Event):
             else:
                 return {Priority(priority_str)}
         else:
-            return cls.ALL_PRIORITIES
+            return Priority.__named__
 
     @classmethod
     def parse_priority(cls, priority_str):
