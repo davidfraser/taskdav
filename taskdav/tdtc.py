@@ -20,7 +20,7 @@ app = aaargh.App(description="A simple command-line tool for interacting with Ta
 
 app.arg('-n', '--calendar-name', help="Name of the calendar to use", default="Tasks")
 app.arg('-c', '--color', dest='color', action="store_true", help="Color output mode", default=True)
-app.arg('-p', '--no-color', dest='color', action="store_false", help="Plain output mode (disable color)")
+app.arg('-m', '--no-color', dest='color', action="store_false", help="Monochrome output mode (disable color)")
 
 def setup_color(enabled):
     """Enables or disables color output"""
@@ -160,14 +160,18 @@ PRIORITY_PREFIX_RE = re.compile('^[(]([A-FHWa-fhw])[)]\s+')
 
 @app.cmd
 @app.cmd_arg('text', type=str, nargs='+', help="The description of the task")
-def add(calendar_name, text, color):
+@app.cmd_arg('-p', '--priority', action='store', dest='priority', default=None, help="Set priority of new task")
+def add(calendar_name, text, priority, color):
     setup_color(color)
     text = " ".join(text)
-    prefix_match = PRIORITY_PREFIX_RE.match(text)
-    if prefix_match:
-        priority, text = Task.parse_priority(prefix_match.group(1)), text[prefix_match.end():]
+    if priority is not None:
+        priority = Priority(priority.upper())
     else:
-        priority = None
+        prefix_match = PRIORITY_PREFIX_RE.match(text)
+        if prefix_match:
+            priority, text = Task.parse_priority(prefix_match.group(1)), text[prefix_match.end():]
+        else:
+            priority = None
     calendar = client.get_calendar(calendar_name)
     try:
         task = Task.new_task(client, parent=calendar, summary=text)
@@ -189,7 +193,7 @@ def addm(calendar_name, tasks, color):
     setup_color(color)
     tasks = [task.strip() for task in " ".join(tasks).split("\n") if task.strip()]
     for task in tasks:
-        add(calendar_name, [task], color)
+        add(calendar_name, [task], None, color)
 
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
