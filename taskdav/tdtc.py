@@ -11,11 +11,14 @@ import re
 import aaargh
 import colorama
 import os
+import subprocess
+import sys
 
 cfg = config.get_config()
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
 client = TaskDAVClient(url)
 cache_dir = cfg.get('cache', 'dir') if cfg.has_option('cache', 'dir') else None
+cache_update = cfg.get('cache', 'update') if cfg.has_option('cache', 'update') else None
 boolean_option = {'t': True, 'true': True, 'y': True, 'yes': True, 'f': False, 'false': False, 'n': False, 'no': False}
 cache_default = (boolean_option[cfg.get('cache', 'default').lower()] if cfg.has_option('cache', 'default') else True) if cache_dir else False
 
@@ -28,11 +31,32 @@ app.arg('-c', '--color', dest='color', action="store_true", help="Color output m
 app.arg('-m', '--no-color', dest='color', action="store_false", help="Monochrome output mode (disable color)")
 
 def cache_args(f):
-    """decorator that adds standard caching arguments to cmd"""
+    """decorator that adds standard caching arguments to a cmd which reads data"""
     use_cache = app.cmd_arg('-C', '--cache', dest='use_cache', action="store_true", help="Use cache directory", default=None)
     no_use_cache = app.cmd_arg('--no-cache', dest='use_cache', action="store_false", help="Don't use cache directory")
     return no_use_cache(use_cache(f))
 
+def cache_update_args(f):
+    """decorator that adds standard caching arguments to a cmd which writes data, and does a background update after that command finishes"""
+    use_cache = app.cmd_arg('-C', '--cache', dest='update_cache', action="store_true", help="Update cache directory after changes", default=None)
+    no_use_cache = app.cmd_arg('--no-cache', dest='update_cache', action="store_false", help="Don't update cache directory after changes")
+    @no_use_cache
+    @use_cache
+    def g(update_cache=None, **kwargs):
+        retval = f(**kwargs)
+        do_cache_update(update_cache)
+        return retval
+    g.__name__ = f.__name__
+    return g
+
+PROCESS_FLAGS = {'creationflags': 0x08} if sys.platform == 'win32' else {}
+
+def do_cache_update(update_cache=None):
+    update_cache = (cache_default and cache_update is not None) if update_cache is None else update_cache
+    if not update_cache:
+        return
+    subprocess.Popen([cache_update], **PROCESS_FLAGS)
+    return
 
 def setup_color(enabled):
     """Enables or disables color output"""
@@ -194,6 +218,7 @@ PRIORITY_PREFIX_RE = re.compile('^[(]([A-FHWa-fhw])[)]\s+')
 @app.cmd
 @app.cmd_arg('text', type=str, nargs='+', help="The description of the task")
 @app.cmd_arg('-p', '--priority', action='store', dest='priority', default=None, help="Set priority of new task")
+@cache_update_args
 def add(calendar_name, text, priority, color):
     setup_color(color)
     text = " ".join(text)
@@ -222,6 +247,7 @@ alias("add", "a")
 
 @app.cmd
 @app.cmd_arg('tasks', type=str, nargs='+', help="The description of the tasks (one per line)")
+@cache_update_args
 def addm(calendar_name, tasks, color):
     setup_color(color)
     tasks = [task.strip() for task in " ".join(tasks).split("\n") if task.strip()]
@@ -231,6 +257,7 @@ def addm(calendar_name, tasks, color):
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
 @app.cmd_arg('text', type=str, nargs='+', help="New summary text for the task")
+@cache_update_args
 def replace(calendar_name, task_id, text, color):
     setup_color(color)
     text = " ".join(text)
@@ -244,6 +271,7 @@ def replace(calendar_name, task_id, text, color):
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
 @app.cmd_arg('text', type=str, nargs='+', help="Extra text to append to the task")
+@cache_update_args
 def append(calendar_name, task_id, text, color):
     setup_color(color)
     text = " ".join(text)
@@ -259,6 +287,7 @@ alias("append", "app")
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to amend")
 @app.cmd_arg('text', type=str, nargs='+', help="Extra text to prepend to the task")
+@cache_update_args
 def prepend(calendar_name, task_id, text, color):
     setup_color(color)
     text = " ".join(text)
@@ -274,6 +303,7 @@ alias("prepend", "prep")
 @app.cmd
 @app.cmd_arg('task_id', type=str, nargs='+', help="ID of the task to delete")
 @app.cmd_arg('-y', action='store_false', dest='prompt', default=True, help="Don't prompt before deletion")
+@cache_update_args
 def rm(calendar_name, task_id, prompt, color):
     setup_color(color)
     calendar = client.get_calendar(calendar_name)
@@ -295,6 +325,7 @@ alias("rm", "del")
 @app.cmd
 @app.cmd_arg('task_id', type=str, help="ID of the task to prioritize")
 @app.cmd_arg('priority', type=str, help="Priority")
+@cache_update_args
 def pri(calendar_name, task_id, priority, color):
     setup_color(color)
     calendar = client.get_calendar(calendar_name)
@@ -308,6 +339,7 @@ alias("pri", "p")
 
 @app.cmd
 @app.cmd_arg('task_ids', type=str, nargs='+', help="ID of the task(s) to deprioritize")
+@cache_update_args
 def depri(calendar_name, task_ids, color):
     setup_color(color)
     calendar = client.get_calendar(calendar_name)
@@ -322,6 +354,7 @@ alias("depri", "dp")
 
 @app.cmd
 @app.cmd_arg('task_ids', type=str, nargs='+', help="ID of the task(s) to mark as done")
+@cache_update_args
 def do(calendar_name, task_ids, color):
     setup_color(color)
     calendar = client.get_calendar(calendar_name)
