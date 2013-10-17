@@ -4,15 +4,18 @@
 
 from taskdav.task import Priority, Task, TaskDAVClient
 from taskdav import config
+from taskdav import short_id
 from datetime import datetime
 import caldav
 import re
 import aaargh
 import colorama
+import os
 
 cfg = config.get_config()
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
 client = TaskDAVClient(url)
+cache_dir = cfg.get('cache', 'dir', None)
 
 utc = caldav.vobject.icalendar.utc
 
@@ -21,6 +24,13 @@ app = aaargh.App(description="A simple command-line tool for interacting with Ta
 app.arg('-n', '--calendar-name', help="Name of the calendar to use", default="Tasks")
 app.arg('-c', '--color', dest='color', action="store_true", help="Color output mode", default=True)
 app.arg('-m', '--no-color', dest='color', action="store_false", help="Monochrome output mode (disable color)")
+
+def cache_args(f):
+    """decorator that adds standard caching arguments to cmd"""
+    use_cache = app.cmd_arg('-C', '--cache', dest='use_cache', action="store_true", help="Use cache directory", default=None)
+    no_use_cache = app.cmd_arg('--no-cache', dest='use_cache', action="store_false", help="Don't use cache directory")
+    return no_use_cache(use_cache(f))
+
 
 def setup_color(enabled):
     """Enables or disables color output"""
@@ -51,12 +61,31 @@ def sorted_tasks(task_lookup):
     """returns the given tasks sorted by priority, then status, then summary"""
     return sorted(task_lookup, key=lambda t: (task_lookup[t].priority, STATUS_KEY.get(task_lookup[t].status.upper(), task_lookup[t].status), task_lookup[t].summary))
 
+def get_tasks(calendar_name, from_cache=False):
+    """gets a calendar and tasks, and returns the tuple of both of them. Loads tasks from cache if necessary"""
+    calendar = client.get_calendar(calendar_name)
+    if from_cache:
+        if cache_dir is None:
+            raise ValueError("Attempt to use cache but cache.dir is not defined in config")
+        if calendar._tasks is None:
+            calendar._tasks = short_id.prefix_dict()
+        tasks = calendar._tasks
+        for filename in os.listdir(cache_dir):
+            if filename.endswith(".ics"):
+                with open(os.path.join(cache_dir, filename)) as f:
+                    t = Task(client, url=None, data=f.read(), parent=calendar, etag=None)
+                    task_id = t.id or (filename.replace(".ics", ""))
+                    tasks[task_id] = t
+    else:
+        tasks = calendar.get_tasks()
+    return calendar, tasks
+
 @app.cmd(name="list", help="Displays all incomplete tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
-def list_(calendar_name, term, color):
+@cache_args
+def list_(calendar_name, term, color, use_cache):
     setup_color(color)
-    calendar = client.get_calendar(calendar_name)
-    task_lookup = calendar.get_tasks()
+    calendar, task_lookup = get_tasks(calendar_name, use_cache)
     # TODO: make lookup by known ID not have to load all tasks
     term = [t.lower() for t in term]
     for task_id in sorted_tasks(task_lookup):
@@ -70,10 +99,10 @@ alias("list", "ls")
 
 @app.cmd(help="Displays all tasks containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
-def listall(calendar_name, term, color):
+@cache_args
+def listall(calendar_name, term, color, use_cache):
     setup_color(color)
-    calendar = client.get_calendar(calendar_name)
-    task_lookup = calendar.get_tasks()
+    calendar, task_lookup = get_tasks(calendar_name, use_cache)
     # TODO: make lookup by known ID not have to load all tasks
     term = [t.lower() for t in term]
     for task_id in sorted_tasks(task_lookup):
@@ -85,11 +114,11 @@ def listall(calendar_name, term, color):
 alias("listall", "lsa")
 
 @app.cmd(help="Reports on the number of open and done tasks")
-def report(calendar_name, color):
+@cache_args
+def report(calendar_name, color, use_cache):
     setup_color(color)
     date = datetime.utcnow().replace(tzinfo=utc)
-    calendar = client.get_calendar(calendar_name)
-    task_lookup = calendar.get_tasks()
+    calendar, task_lookup = get_tasks(calendar_name, use_cache)
     task_status_count = {}
     for task_id in task_lookup:
         task = calendar.get_task(task_id)
@@ -102,7 +131,8 @@ def report(calendar_name, color):
 @app.cmd(help="Displays all incomplete tasks of the given (or any) priority containing the given search terms (if any) either as ID prefix or summary text; a term like test- ending with a - is a negative search")
 @app.cmd_arg('priority', type=str, nargs='?', help="Priority")
 @app.cmd_arg('term', type=str, nargs='*', help="Search terms")
-def listpri(calendar_name, priority, term, color):
+@cache_args
+def listpri(calendar_name, priority, term, color, use_cache):
     setup_color(color)
     try:
         priorities = Task.parse_priority_range(priority)
@@ -110,8 +140,7 @@ def listpri(calendar_name, priority, term, color):
         # Assume this wasn't really a priority
         term.insert(0, priority)
         priorities = Priority.__named__
-    calendar = client.get_calendar(calendar_name)
-    task_lookup = calendar.get_tasks()
+    calendar, task_lookup = get_tasks(calendar_name, use_cache)
     term = [t.lower() for t in term]
     for task_id in sorted_tasks(task_lookup):
         task = calendar.get_task(task_id)
@@ -125,10 +154,10 @@ alias("listpri", "lsp")
 CONTEXT_RE = re.compile(r'(?:^|\s)(@\w*\b)')
 
 @app.cmd(help="Lists all the task contexts that start with the @ sign in task summaries")
-def listcon(calendar_name, color):
+@cache_args
+def listcon(calendar_name, color, use_cache):
     setup_color(color)
-    calendar = client.get_calendar(calendar_name)
-    task_lookup = calendar.get_tasks()
+    calendar, task_lookup = get_tasks(calendar_name, use_cache)
     contexts = set()
     for task_id in task_lookup:
         task = calendar.get_task(task_id)
@@ -142,10 +171,10 @@ alias("listcon", "lsc")
 PROJ_RE = re.compile(r'(?:^|\s)(\+\w*\b)')
 
 @app.cmd(help="Lists all the task projects that start with the + sign in task summaries")
-def listproj(calendar_name, color):
+@cache_args
+def listproj(calendar_name, color, use_cache):
     setup_color(color)
-    calendar = client.get_calendar(calendar_name)
-    task_lookup = calendar.get_tasks()
+    calendar, task_lookup = get_tasks(calendar_name, use_cache)
     projects = set()
     for task_id in task_lookup:
         task = calendar.get_task(task_id)
