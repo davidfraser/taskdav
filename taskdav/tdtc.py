@@ -15,7 +15,9 @@ import os
 cfg = config.get_config()
 url = cfg.get('server', 'url').replace("://", "://%s:%s@" % (cfg.get('server', 'username'), cfg.get('server', 'password'))) + "dav/%s/" % (cfg.get('server', 'username'),)
 client = TaskDAVClient(url)
-cache_dir = cfg.get('cache', 'dir', None)
+cache_dir = cfg.get('cache', 'dir') if cfg.has_option('cache', 'dir') else None
+boolean_option = {'t': True, 'true': True, 'y': True, 'yes': True, 'f': False, 'false': False, 'n': False, 'no': False}
+cache_default = (boolean_option[cfg.get('cache', 'default').lower()] if cfg.has_option('cache', 'default') else True) if cache_dir else False
 
 utc = caldav.vobject.icalendar.utc
 
@@ -61,8 +63,9 @@ def sorted_tasks(task_lookup):
     """returns the given tasks sorted by priority, then status, then summary"""
     return sorted(task_lookup, key=lambda t: (task_lookup[t].priority, STATUS_KEY.get(task_lookup[t].status.upper(), task_lookup[t].status), task_lookup[t].summary))
 
-def get_tasks(calendar_name, from_cache=False):
+def get_tasks(calendar_name, use_cache=None):
     """gets a calendar and tasks, and returns the tuple of both of them. Loads tasks from cache if necessary"""
+    from_cache = cache_default if use_cache is None else use_cache
     if from_cache:
         if cache_dir is None:
             raise ValueError("Attempt to use cache but cache.dir is not defined in config")
