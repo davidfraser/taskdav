@@ -2,7 +2,7 @@
 
 """todo.txt command-line compatibility - implements many commands from todo.txt"""
 
-from taskdav.task import Priority, Task, TaskDAVClient
+from taskdav.task import Priority, Task, TaskList, TaskDAVClient
 from taskdav import config
 from taskdav import short_id
 from datetime import datetime
@@ -63,10 +63,10 @@ def sorted_tasks(task_lookup):
 
 def get_tasks(calendar_name, from_cache=False):
     """gets a calendar and tasks, and returns the tuple of both of them. Loads tasks from cache if necessary"""
-    calendar = client.get_calendar(calendar_name)
     if from_cache:
         if cache_dir is None:
             raise ValueError("Attempt to use cache but cache.dir is not defined in config")
+        calendar = TaskList(client)
         if calendar._tasks is None:
             calendar._tasks = short_id.prefix_dict()
         tasks = calendar._tasks
@@ -77,6 +77,7 @@ def get_tasks(calendar_name, from_cache=False):
                     task_id = t.id or (filename.replace(".ics", ""))
                     tasks[task_id] = t
     else:
+        calendar = client.get_calendar(calendar_name)
         tasks = calendar.get_tasks()
     return calendar, tasks
 
